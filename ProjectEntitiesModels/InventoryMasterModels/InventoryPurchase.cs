@@ -851,6 +851,8 @@
         public string MainUnit { get; set; } = string.Empty;
         public string MainUnitConverstion { get; set; } = string.Empty;
         public string Branch_Code { get; set; } = string.Empty;
+        public string StockSource { get; set; } = string.Empty;
+        public int StockReferenceNo { get; set; } = 0;
     }
 
     public class IndentOrderSaveRequest
@@ -891,6 +893,8 @@
         public string Branch_Code { get; set; } = string.Empty;
         public decimal ReamingQty { get; set; } = 0;
         public decimal ApprovedQty { get; set; } = 0;
+        public int StockReferenceNo { get; set; } = 0;
+        public string StockSource { get; set; } = string.Empty;
     }
     public class IndentOrderMasterList
     {
@@ -950,6 +954,7 @@
         public int PNo { get; set; }
         public int IONo { get; set; }
         public int ItemCode { get; set; }
+        public string ItemName { get; set; } = string.Empty;
         public string? Unit { get; set; }
         public int? UnitCode { get; set; }
         public decimal IOItemQty { get; set; }
@@ -961,10 +966,14 @@
         public decimal AvailableQty { get; set; }
         public decimal OrginalQty { get; set; }
         public decimal IndentQty { get; set; }
+        public string StockSource { get; set; } = string.Empty;
+        public int StockReferenceNo { get; set; } = 0;
+        public int ReamingQty { get; set; } = 0;
 
     }
     public class IndentOrderApprovalModel
     {
+        public string? PurchaseNo { get; set; } = string.Empty;
         public int IONo { get; set; }
         public DateTime IODate { get; set; }
         public DateTime POValidDate { get; set; } = DateTime.Now;
@@ -998,6 +1007,7 @@
     }
     public class ItemIssueSaveRequest
     {
+        public string TrasnsactionNo { get; set; } = string.Empty;
         public int INo { get; set; }
         public DateTime IssueDate { get; set; }
         public int DepCode { get; set; }
@@ -1023,14 +1033,20 @@
         public decimal ItemRate { get; set; }
         public string Unit { get; set; } = string.Empty;
         public int UnitCode { get; set; } = 0;
-        public decimal PNo { get; set; }
+        public int PNo { get; set; }
         public decimal QtyPer { get; set; }
         public decimal NoOfQty { get; set; }
         public string Branch_Code { get; set; } = string.Empty;
+        public decimal OrginalQty { get; set; }
         public decimal AvailableQty { get; set; }
         public decimal ReturnQty { get; set; }
         public string MainUnit { get; set; } = string.Empty;
         public string MainUnitConverstion { get; set; } = string.Empty;
+        public string StoreId { get; set; } = string.Empty;
+        public int DepCode { get; set; } = 0;
+        public string StockSource { get; set; } = string.Empty;
+        public int StockReferenceNo { get; set; } = 0;
+
 
     }
     public class ItemIssueList
@@ -1048,6 +1064,7 @@
         public bool IsMinibar { get; set; }
         public string StoreId { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string TrasnsactionNo { get; set; } = string.Empty;
     }
     public class ItemIssueListDto
     {
@@ -1079,7 +1096,66 @@
         public decimal IRNoofQty { get; set; }
         public decimal ReturnQty { get; set; }
         public decimal AvailableQty { get; set; }
-        public string PNo { get; set; } = string.Empty;
+        public int PNo { get; set; } = 0;
+        public int IndentNo { get; set; }
+        public int UnitCode { get; set; } = 0;
+        public string Unit { get; set; } = string.Empty;
+        public string MainUnit { get; set; } = string.Empty;
+        public string MainUnitConverstion { get; set; } = string.Empty;
+        public string StockSource { get; set; } = string.Empty;
+        public int StockReferenceNo { get; set; } = 0;
+    }
+    #endregion
+
+    #region Item Opening Stock
+    public class ItemOpeningStock
+    {
+        public int OpeningStockId { get; set; }
+        public int ItemCode { get; set; }
+        public int StoreId { get; set; }
+        public int? DeptCode { get; set; }
+        public string Branch_Code { get; set; } = string.Empty;
+        public DateTime StockDate { get; set; }
+        public decimal OpeningQty { get; set; }
+        public decimal ClosingQty { get; set; }
+        public decimal OpeningRate { get; set; }
+        public int? UnitCode { get; set; }
+        public string? UnitName { get; set; }
+        public decimal BaseOpeningQty { get; set; }
+        public int? BaseUnitCode { get; set; }
+        public string? BaseUnitName { get; set; }
+        public bool IsActive { get; set; } = true;
+        public int? CreatedBy { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public int? ModifiedBy { get; set; }
+        public DateTime? ModifiedDate { get; set; }
+    }
+    public class ItemPurchaseStock
+    {
+        public int PurchaseStockId { get; set; }
+        public int PurchaseNo { get; set; }
+        public int? PONo { get; set; }
+        public DateTime PurchaseDate { get; set; }
+        public int ItemCode { get; set; }
+        public int StoreId { get; set; }
+        public string Branch_Code { get; set; } = string.Empty;
+        public decimal PurchaseQty { get; set; }
+        public decimal PurchaseApprovalQty { get; set; }
+        public decimal ReceivedQty { get; set; }
+        public decimal ReturnQty { get; set; }
+        public decimal DamageQty { get; set; }
+        public decimal IssueQty { get; set; }
+        public decimal IssueReturnQty { get; set; }
+        public decimal IndentQty { get; set; }
+        public decimal IndentApprovalQty { get; set; }
+        public decimal AvailableQty { get; set; }
+        public decimal PurchaseRate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public bool IsActive { get; set; } = true;
+        public int? CreatedBy { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public int? ModifiedBy { get; set; }
+        public DateTime? ModifiedDate { get; set; }
     }
     #endregion
 }

@@ -717,15 +717,15 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
         }
 
         [HttpGet("GetItemIssuePrintData")]
-        public async Task<IActionResult?> GetItemIssuePrintData([FromQuery] string BranchCode, [FromQuery] int iNo)
+        public async Task<IActionResult?> GetItemIssuePrintData([FromQuery] string BranchCode, [FromQuery] int ItemissueNo)
         {
             if (string.IsNullOrWhiteSpace(BranchCode))
                 return Fail("Branch code is required");
 
-            if (iNo <= 0)
+            if (ItemissueNo <=0 )
                 return Fail("Invalid Item Issue No.");
 
-            var result = await _service.GetItemIssuePrintData(BranchCode, iNo);
+            var result = await _service.GetItemIssuePrintData(BranchCode, ItemissueNo);
 
             return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
                 "Item issue data retrieved successfully"));
@@ -744,7 +744,90 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
             return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
                 "Item issue data retrieved successfully"));
         }
+
+        [HttpPost("ItemIssueReturnSave")]
+        public async Task<IActionResult> ItemIssueReturnSave([FromBody] ItemIssueReturnSaveRequest request)
+        {
+            if (request == null)
+                return Fail("Invalid request payload");
+
+            if (request.Items == null || request.Items.Count == 0)
+                return Fail("Indent details are required");
+
+            var result = await _service.ItemIssueReturnSave(request);
+
+            return CreatedAtAction(nameof(GetItemIssueReturnPrintData), new { id = result },
+              ApiResponse<int>.SuccessResult(result, "Item issue returned successfully"));
+        }
+
+        [HttpGet("GetItemIssueReturnPrintData")]
+        public async Task<IActionResult?> GetItemIssueReturnPrintData([FromQuery] string BranchCode, [FromQuery] int iNo)
+        {
+            if (string.IsNullOrWhiteSpace(BranchCode))
+                return Fail("Branch code is required");
+
+            if (iNo <= 0)
+                return Fail("Invalid Item Issue Return No.");
+
+            var result = await _service.GetItemIssueReturnPrintData(BranchCode, iNo);
+
+            return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
+                "Item issue return data retrieved successfully"));
+        }
         #endregion
 
+        //#region Opening Stock
+        //[HttpGet("GetOpeningStockList")]
+        //public async Task<IActionResult> GetOpeningStockList([FromQuery] string BranchCode, [FromQuery] int StoreId) 
+        //{ 
+        //    if (string.IsNullOrWhiteSpace(BranchCode)) 
+        //        return Fail("Branch code is required"); 
+
+        //    if (StoreId <= 0) return Fail("Invalid Store Id."); 
+
+        //    var result = await _service.GetOpeningStockListAsync(BranchCode, StoreId); 
+
+        //    return Ok(ApiResponse<List<ItemOpeningStock>>.SuccessResult(
+        //        result, "Opening stock list retrieved successfully")); 
+        //}
+        //[HttpPost("OpenStockDataSave")] 
+        //public async Task<IActionResult> OpenStockDataSave([FromBody] ItemOpeningStock request) 
+        //{ 
+        //    if (request == null)
+        //    {
+        //        return Fail("Invalid request payload");
+        //    }
+        //    var result = await _service.SaveOpeningStockAsync(request); 
+
+        //    return Ok(ApiResponse<int>.SuccessResult(result, 
+        //        "Opening stock saved successfully")); 
+        //}
+        //[HttpPut("OpenStockDataUpdate")] 
+        //public async Task<IActionResult> OpenStockDataUpdate([FromBody] ItemOpeningStock request) 
+        //{ 
+        //    if (request == null) return Fail("Invalid request payload"); 
+
+        //    var result = await _service.UpdateOpeningStockAsync(request); 
+
+        //    if (!result) return Fail("Opening stock not found or update failed."); 
+
+        //    return Ok(ApiResponse<bool>.SuccessResult(true, "Opening stock updated successfully")); 
+        //}
+        //[HttpDelete("DeleteOpeningStock")] 
+        //public async Task<IActionResult> DeleteOpeningStock([FromQuery] int openingStockId, [FromQuery] int modifiedBy) 
+        //{ 
+        //    if (openingStockId <= 0) 
+        //        return Fail("Invalid Opening StockId"); 
+
+        //    if (modifiedBy <= 0) return Fail("Invalid ModifiedBy"); 
+
+        //    var deleted = await _service.DeleteOpeningStockAsync(openingStockId, modifiedBy); 
+
+        //    if (!deleted) return Fail("Opening stock not found or already deleted."); 
+
+        //    return Ok(ApiResponse<bool>.SuccessResult(true, 
+        //        "Opening stock deleted successfully")); 
+        //}
+        //#endregion
     }
 }

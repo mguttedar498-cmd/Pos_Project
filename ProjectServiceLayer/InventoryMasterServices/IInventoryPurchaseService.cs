@@ -50,5 +50,11 @@ namespace HMS_360_PMS.ProjectServiceLayer.InventoryMasterServices
         Task<int> ItemIssueSave(ItemIssueSaveRequest request);
         Task<List<ItemIssueListDto>> GetItemIssuePrintData(string branchCode, int iNo);
         Task<List<ItemIssueListDto>> GetItemIssueData(string branchCode);
+        Task<int> ItemIssueReturnSave(ItemIssueReturnSaveRequest request);
+        Task<List<ItemIssueListDto>> GetItemIssueReturnPrintData(string branchCode, int iNo);
+        Task<List<ItemOpeningStock>> GetOpeningStockListAsync(string branchCode, int storeId);
+        Task<int> SaveOpeningStockAsync(ItemOpeningStock request);
+        Task<bool> UpdateOpeningStockAsync(ItemOpeningStock request);
+        Task<bool> DeleteOpeningStockAsync(int openingStockId, int modifiedBy);
     }
 }

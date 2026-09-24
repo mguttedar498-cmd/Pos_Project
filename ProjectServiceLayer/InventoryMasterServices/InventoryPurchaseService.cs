@@ -430,6 +430,29 @@ namespace HMS_360_PMS.ProjectServiceLayer.InventoryMasterServices
         {
             return await _repository.GetItemIssueData(branchCode);
         }
-
+        public async Task<int> ItemIssueReturnSave(ItemIssueReturnSaveRequest request)
+        {
+            return await _repository.ItemIssueReturnSave(request);
+        }
+        public async Task<List<ItemIssueListDto>> GetItemIssueReturnPrintData(string branchCode, int iNo)
+        {
+            return await _repository.GetItemIssueReturnPrintData(branchCode, iNo);
+        }
+        public async Task<List<ItemOpeningStock>> GetOpeningStockListAsync(string branchCode, int storeId)
+        {
+            return await _repository.GetOpeningStockListAsync(branchCode, storeId);
+        }
+        public async Task<int> SaveOpeningStockAsync(ItemOpeningStock request)
+        {
+            return await _repository.SaveOpeningStockAsync(request);
+        }
+        public async Task<bool> UpdateOpeningStockAsync(ItemOpeningStock request)
+        {
+            return await _repository.UpdateOpeningStockAsync(request);
+        }
+        public async Task<bool> DeleteOpeningStockAsync(int openingStockId, int modifiedBy)
+        {
+            return await _repository.DeleteOpeningStockAsync(openingStockId, modifiedBy);
+        }
     }
 }

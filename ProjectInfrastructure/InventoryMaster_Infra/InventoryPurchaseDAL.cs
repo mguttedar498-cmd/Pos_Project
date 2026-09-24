@@ -7,6 +7,7 @@ using HMS_360_PMS.EntitiesModels.POS;
 using HMS_360_PMS.HMS_360_PMS.Infrastructure;
 using HMS_360_PMS.ProjectEntitiesModels.InventoryMasterModels;
 using HMS_360_PMS.ProjectEntitiesModels.Master;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.Data.SqlClient;
 using QuestPDF.Infrastructure;
 using System.Data;
@@ -1883,7 +1884,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             StoredId,
                             Branch_Code,
                             UserCode,
-                            Status
+                            Status,
+                            TrasnsactionNo
                         )
                         VALUES
                         (
@@ -1898,7 +1900,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             @StoredId,
                             @Branch_Code,
                             @UserCode,
-                            @Status
+                            @Status,
+                            @TrasnsactionNo
                         )";
 
                     await connection.ExecuteAsync(
@@ -1916,7 +1919,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             StoredId = request.StoredId,
                             Branch_Code=request.BranchCode,
                             request.UserCode,
-                            Status = "DirectIssue"
+                            Status = "DirectIssue",
+                            TrasnsactionNo=request.PNo
                         },
                         transaction);
                 }
@@ -2107,6 +2111,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 INo,
                                 ItemCode,
                                 IItemQty,
+                                IssuedQty,
                                 IItemRate,
                                 unit,
                                 qtyPer,
@@ -2121,13 +2126,16 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 ReturnQty,
                                 MainUnit,
                                 MainUnitConverstion,
-                                StoreId
+                                StoreId,
+                                TrasnsactionNo,
+                                OrginalQty
                             )
                             VALUES
                             (
                                 @IssueNo,
                                 @ItemCode,
                                 @IItemQty,
+                                @IssuedQty,
                                 @IItemRate,
                                 @Unit,
                                 @QtyPer,
@@ -2142,7 +2150,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 @AvailableQty,
                                 @ReturnQty,
                                 @MainUnit,
-                                @MainUnitConverstion
+                                @MainUnitConverstion,
+                                @TrasnsactionNo,
+                                @OrginalQty
                             )";
 
                         await connection.ExecuteAsync(
@@ -2152,6 +2162,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 IssueNo = issueNo,
                                 item.ItemCode,
                                 IItemQty = item.PItemQty,
+                                IssuedQty = item.PItemQty,
+                                OrginalQty = item.PItemQty,
                                 IItemRate = item.PItemRate,
                                 item.Unit,
                                 QtyPer = 1,
@@ -2166,7 +2178,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 AvailableQty = 0,
                                 ReturnQty = 0,
                                 MainUnit = item.MainUnit,
-                                MainUnitConverstion = item.MainUnitConverstion
+                                MainUnitConverstion = item.MainUnitConverstion,
+                                TrasnsactionNo= request.PNo
                             },
                             transaction);
                     }
@@ -3592,8 +3605,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
 
-            //ISNULL(pd.PItemQty - ISNULL(pd.PItemReturnQty, 0) - ISNULL(pd.DamageQty, 0), 0) AS AvailableQty,
-
             const string itemSql = @"SELECT pd.PNo, pd.PONo,i.ItemCode,i.ItemName,ISNULL(pd.PItemRate, 0) AS ItemRate,
             CASE WHEN (ISNULL(pd.PItemQty, 0) - ISNULL(pd.PItemReturnQty, 0) - ISNULL(pd.DamageQty, 0)- 
             CASE WHEN ISNULL(pd.IndentApprovedQty, 0) > 0
@@ -3603,9 +3614,23 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ELSE ISNULL(pd.IndentOrderQty, 0) END) END AS AvailableQty,
             ISNULL(pd.PItemQty, 0) as PItemQty,ISNULL(pd.PItemReturnQty, 0) as PItemReturnQty, 
             ISNULL(pd.DamageQty, 0) DamageQty,pd.unit AS UnitName,ISNULL(pd.StoredId, '') StoredId, 
-            pd.UnitCode,pd.MainUnit,pd.MainUnitConverstion,Pd.Branch_Code FROM PurchaseDetail pd
+            pd.UnitCode,pd.MainUnit,pd.MainUnitConverstion,Pd.Branch_Code,
+            'PurchaseStock' AS StockSource,pd.PNo AS StockReferenceNo
+            FROM PurchaseDetail pd
             INNER JOIN InventoryItemMaster i ON i.ItemCode = pd.ItemCode AND i.Branch_Code = pd.Branch_Code
-            WHERE i.ItemCode = @ItemCode AND i.Branch_Code = @BranchCode;";
+            WHERE i.ItemCode = @ItemCode AND i.Branch_Code = @BranchCode AND pd.StoredId = @StoreId
+            UNION ALL
+            SELECT 0 AS PNo, 0 AS PONo,i.ItemCode,i.ItemName,ISNULL(os.OpeningRate, 0) AS ItemRate,
+            CASE WHEN ISNULL(IndentApprovalQty, 0) > 0 THEN ISNULL(OpeningQty, 0) - ISNULL(IndentApprovalQty, 0)
+            ELSE ISNULL(OpeningQty, 0) - ISNULL(IndentOrderQty, 0) END AS AvailableQty,
+            ISNULL(os.OpeningQty, 0) AS PItemQty,
+            0 AS PItemReturnQty,0 AS DamageQty, os.UnitName,os.StoreId AS StoredId,os.UnitCode,
+            os.BaseUnitName AS MainUnit,os.BaseUnitCode AS MainUnitConverstion,os.Branch_Code,
+            'OpenStock' AS StockSource,os.OpeningStockId AS StockReferenceNo
+            FROM Tbl_ItemOpeningStock os
+            INNER JOIN InventoryItemMaster i ON i.ItemCode = os.ItemCode AND i.Branch_Code = os.Branch_Code
+            WHERE os.ItemCode = @ItemCode AND os.Branch_Code = @BranchCode AND os.StoreId = @StoreId 
+            AND os.IsActive = 1 ORDER BY PNo ASC;";
 
             var items = await connection.QueryAsync<ItemDetailsResponse>(
                 itemSql,
@@ -3615,9 +3640,255 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     BranchCode = request.BranchCode,
                     StoreId = request.StoreId
                 });
-
-            return items.ToList();
+            return items.Where(x => x.AvailableQty > 0).ToList();
         }
+        //        public async Task<List<ItemDetailsResponse>> GetItemDetailsIndentOrder(
+        //    GetItemDetailsRequest request)
+        //        {
+        //            using var connection = _factory.CreateConnection(DbNames.POS);
+
+        //            const string itemSql = @"
+        //SELECT
+        //    pd.PNo,
+        //    pd.PONo,
+        //    i.ItemCode,
+        //    i.ItemName,
+        //    ISNULL(pd.PItemRate, 0) AS ItemRate,
+
+        //    CASE
+
+        //        /* Physical stock is zero or negative */
+        //        WHEN
+        //            (
+        //                ISNULL(pd.PItemQty, 0)
+        //                - ISNULL(pd.PItemReturnQty, 0)
+        //                - ISNULL(pd.DamageQty, 0)
+        //            ) <= 0
+        //        THEN 0
+
+        //        /* No approved quantity anywhere */
+        //        WHEN
+        //            (
+        //                SELECT MAX(ISNULL(pd2.IndentApprovedQty, 0))
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //            ) <= 0
+        //        THEN
+        //            (
+        //                ISNULL(pd.PItemQty, 0)
+        //                - ISNULL(pd.PItemReturnQty, 0)
+        //                - ISNULL(pd.DamageQty, 0)
+        //            )
+
+        //        /* Approved quantity is completely consumed by previous PNos */
+        //        WHEN
+        //            (
+        //                SELECT
+        //                    ISNULL
+        //                    (
+        //                        SUM
+        //                        (
+        //                            ISNULL(pd2.PItemQty, 0)
+        //                            - ISNULL(pd2.PItemReturnQty, 0)
+        //                            - ISNULL(pd2.DamageQty, 0)
+        //                        ),
+        //                        0
+        //                    )
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //                  AND pd2.PNo < pd.PNo
+        //            )
+        //            >=
+        //            (
+        //                SELECT MAX(ISNULL(pd2.IndentApprovedQty, 0))
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //            )
+        //        THEN
+        //            (
+        //                ISNULL(pd.PItemQty, 0)
+        //                - ISNULL(pd.PItemReturnQty, 0)
+        //                - ISNULL(pd.DamageQty, 0)
+        //            )
+
+        //        /* Approved quantity falls inside this PNo */
+        //        WHEN
+        //            (
+        //                SELECT MAX(ISNULL(pd2.IndentApprovedQty, 0))
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //            )
+        //            -
+        //            (
+        //                SELECT
+        //                    ISNULL
+        //                    (
+        //                        SUM
+        //                        (
+        //                            ISNULL(pd2.PItemQty, 0)
+        //                            - ISNULL(pd2.PItemReturnQty, 0)
+        //                            - ISNULL(pd2.DamageQty, 0)
+        //                        ),
+        //                        0
+        //                    )
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //                  AND pd2.PNo < pd.PNo
+        //            )
+        //            <
+        //            (
+        //                ISNULL(pd.PItemQty, 0)
+        //                - ISNULL(pd.PItemReturnQty, 0)
+        //                - ISNULL(pd.DamageQty, 0)
+        //            )
+        //        THEN
+        //            (
+        //                ISNULL(pd.PItemQty, 0)
+        //                - ISNULL(pd.PItemReturnQty, 0)
+        //                - ISNULL(pd.DamageQty, 0)
+        //            )
+        //            -
+        //            (
+        //                SELECT MAX(ISNULL(pd2.IndentApprovedQty, 0))
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //            )
+        //            +
+        //            (
+        //                SELECT
+        //                    ISNULL
+        //                    (
+        //                        SUM
+        //                        (
+        //                            ISNULL(pd2.PItemQty, 0)
+        //                            - ISNULL(pd2.PItemReturnQty, 0)
+        //                            - ISNULL(pd2.DamageQty, 0)
+        //                        ),
+        //                        0
+        //                    )
+        //                FROM PurchaseDetail pd2
+        //                WHERE pd2.ItemCode = pd.ItemCode
+        //                  AND pd2.Branch_Code = pd.Branch_Code
+        //                  AND pd2.StoredId = pd.StoredId
+        //                  AND pd2.PNo < pd.PNo
+        //            )
+
+        //        ELSE 0
+
+        //    END AS AvailableQty,
+
+        //    ISNULL(pd.PItemQty, 0) AS PItemQty,
+        //    ISNULL(pd.PItemReturnQty, 0) AS PItemReturnQty,
+        //    ISNULL(pd.DamageQty, 0) AS DamageQty,
+
+        //    pd.Unit AS UnitName,
+        //    ISNULL(pd.StoredId, 0) AS StoredId,
+        //    pd.UnitCode,
+        //    pd.MainUnit,
+        //    pd.MainUnitConverstion,
+        //    pd.Branch_Code,
+
+        //    'PurchaseStock' AS StockSource,
+        //    pd.PNo AS StockReferenceNo
+
+        //FROM PurchaseDetail pd
+
+        //INNER JOIN InventoryItemMaster i
+        //    ON i.ItemCode = pd.ItemCode
+        //    AND i.Branch_Code = pd.Branch_Code
+
+        //WHERE i.ItemCode = @ItemCode
+        //  AND i.Branch_Code = @BranchCode
+        //  AND pd.StoredId = @StoreId
+
+
+        //UNION ALL
+
+
+        //-- ============================================================
+        //-- OPENING STOCK
+        //-- ============================================================
+
+        //SELECT
+        //    0 AS PNo,
+        //    0 AS PONo,
+        //    i.ItemCode,
+        //    i.ItemName,
+
+        //    ISNULL(os.OpeningRate, 0) AS ItemRate,
+
+        //    CASE
+
+        //        /* No approval */
+        //        WHEN ISNULL(os.IndentApprovalQty, 0) <= 0
+        //        THEN
+        //            ISNULL(os.OpeningQty, 0)
+
+        //        /* Approved quantity */
+        //        WHEN
+        //            ISNULL(os.OpeningQty, 0)
+        //            - ISNULL(os.IndentApprovalQty, 0) < 0
+        //        THEN 0
+
+        //        ELSE
+        //            ISNULL(os.OpeningQty, 0)
+        //            - ISNULL(os.IndentApprovalQty, 0)
+
+        //    END AS AvailableQty,
+
+        //    ISNULL(os.OpeningQty, 0) AS PItemQty,
+
+        //    0 AS PItemReturnQty,
+        //    0 AS DamageQty,
+
+        //    os.UnitName,
+        //    os.StoreId AS StoredId,
+        //    os.UnitCode,
+
+        //    os.BaseUnitName AS MainUnit,
+        //    os.BaseUnitCode AS MainUnitConverstion,
+
+        //    os.Branch_Code,
+
+        //    'OpenStock' AS StockSource,
+        //    os.OpeningStockId AS StockReferenceNo
+
+        //FROM Tbl_ItemOpeningStock os
+
+        //INNER JOIN InventoryItemMaster i
+        //    ON i.ItemCode = os.ItemCode
+        //    AND i.Branch_Code = os.Branch_Code
+
+        //WHERE os.ItemCode = @ItemCode
+        //  AND os.Branch_Code = @BranchCode
+        //  AND os.StoreId = @StoreId
+        //  AND os.IsActive = 1
+
+        //ORDER BY PNo ASC;";
+
+        //            var items = await connection.QueryAsync<ItemDetailsResponse>(
+        //                itemSql,
+        //                new
+        //                {
+        //                    ItemCode = request.ItemCode,
+        //                    BranchCode = request.BranchCode,
+        //                    StoreId = request.StoreId
+        //                });
+
+        //            return items.ToList();
+        //        }
 
         public async Task<int> SaveIndentOrderAsync(IndentOrderSaveRequest request)
         {
@@ -3718,7 +3989,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     StoreId,
                     IOORG,
                     IOAQty,
-                    IndentOrderQty
+                    IndentOrderQty,
+                    StockReferenceNo,
+                    StockSource
                 )
                 VALUES
                 (
@@ -3737,55 +4010,80 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     @StoreId,
                     @IOORG,
                     @IOAQty,
-                    @IndentOrderQty
+                    @IndentOrderQty,
+                    @StockReferenceNo,
+                    @StockSource
                 );";
 
                 foreach (var item in request.Items)
                 {
-                    if (item.ItemCode <= 0)
-                    {
-                        throw new Exception("Invalid ItemCode.");
-                    }
-                    if (item.IOItemQty <= 0)
-                    {
-                        throw new Exception(
-                            $"Quantity must be greater than 0 for ItemCode {item.ItemCode}.");
-                    }
-                    await connection.ExecuteAsync(
-                        detailSql,
-                        new
+                        if (item.ItemCode <= 0)
                         {
-                            PNo = item.PNo,
-                            IONo = request.IONo,
-                            ItemCode = item.ItemCode,
-                            IOItemQty = item.IOItemQty,
-                            IOItemRate = item.IOItemRate,
-                            BranchCode = request.BranchCode,
-                            Unit = item.Unit,
-                            UnitCode = item.UnitCode,
-                            MainUnit=item.MainUnit,
-                            MainUnitConverstion = item.MainUnitConverstion,
-                            StoreId = request.StoreId,
-                            IOORG = item.IOOrginalQty,
-                            IOAQty = item.IOAvailableQty,
-                            IndentOrderQty = item.IOItemQty,
-                        },
-                        transaction);
-
-                    const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
-                    SET IndentOrderQty =ISNULL(IndentOrderQty, 0) + @IndentOrderQty
-                    WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
-
-                    int purchaseUpdated = await connection.ExecuteAsync(
-                        purchaseUpdateQuery,
-                        new
+                            throw new Exception("Invalid ItemCode.");
+                        }
+                        if (item.IOItemQty <= 0)
                         {
-                            ItemCode = item.ItemCode,
-                            PNo = item.PNo,
-                            IndentOrderQty = item.IOItemQty,
-                            BranchCode = request.BranchCode
-                        },
-                        transaction);
+                            throw new Exception($"Quantity must be greater than 0 for ItemCode {item.ItemCode}.");
+                        }
+                        await connection.ExecuteAsync(
+                            detailSql,
+                            new
+                            {
+                                PNo = item.PNo,
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                IOItemQty = item.IOItemQty,
+                                IOItemRate = item.IOItemRate,
+                                BranchCode = request.BranchCode,
+                                Unit = item.Unit,
+                                UnitCode = item.UnitCode,
+                                MainUnit = item.MainUnit,
+                                MainUnitConverstion = item.MainUnitConverstion,
+                                StoreId = request.StoreId,
+                                IOORG = item.IOOrginalQty,
+                                IOAQty = item.IOAvailableQty,
+                                IndentOrderQty = item.IOItemQty,
+                                StockReferenceNo = item.StockReferenceNo,
+                                StockSource = item.StockSource
+                            },
+                            transaction);
+
+                    if (item.PNo > 0)
+                    {
+                        const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
+                        SET IndentOrderQty =ISNULL(IndentOrderQty, 0) + @IndentOrderQty
+                        WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
+
+                        int purchaseUpdated = await connection.ExecuteAsync(
+                            purchaseUpdateQuery,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                PNo = item.PNo,
+                                IndentOrderQty = item.IOItemQty,
+                                BranchCode = request.BranchCode
+                            },
+                            transaction);
+                    }
+                    else if(item.PNo == 0)
+                    {
+                        const string getPOItemQtyQuery = @"UPDATE Tbl_ItemOpeningStock
+                        SET IndentOrderQty =ISNULL(IndentOrderQty, 0) + @IndentOrderQty
+                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                        AND Storeid = @StoreId";
+
+                        var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            getPOItemQtyQuery,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.BranchCode,
+                                IndentOrderQty = item.IOItemQty,
+                                Storeid = request.StoreId
+                            },
+                            transaction
+                        );
+                    }
                 }
 
                 transaction.Commit();
@@ -3819,7 +4117,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(D.MainUnit, '') AS MainUnit,ISNULL(D.MainUnitConverstion, 0) AS MainUnitConverstion,
             ISNULL(D.StoreId, 0) AS StoreId,ISNULL(D.IOORG, 0) AS IOOrginalQty,
             ISNULL(D.IOAQty, 0) AS IOAvailableQty,ISNULL(D.PNo, 0) AS PNo,
-            ISNULL(D.Branch_Code, '') AS Branch_Code
+            ISNULL(D.Branch_Code, '') AS Branch_Code,ISNULL(D.StockSource, '') AS StockSource,
+            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo
             FROM IndentOrderDetail D
             LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode AND D.Branch_Code = I.Branch_Code
             WHERE D.Branch_Code = @BranchCode AND (@IONo = 0 OR D.IONo = @IONo)
@@ -3873,7 +4172,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(D.IOAQty, 0) AS IOAvailableQty,ISNULL(D.Branch_Code, '') AS Branch_Code,
             ISNULL(D.ApprovedQty, 0) AS ApprovedQty,ISNULL(D.PNo, 0) AS PNo,
             CASE  WHEN ISNULL(d.IOAQty, 0) - ISNULL(d.AvailableQty, 0) < 0 
-            THEN 0 ELSE ISNULL(d.IOAQty, 0) - ISNULL(d.AvailableQty, 0) END AS ReamingQty
+            THEN 0 ELSE ISNULL(d.IOAQty, 0) - ISNULL(d.AvailableQty, 0) END AS ReamingQty,
+            ISNULL(D.StockSource, '') AS StockSource,ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo
             FROM IndentOrderDetail D
             LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode AND D.Branch_Code = I.Branch_Code
             WHERE D.Branch_Code = @BranchCode
@@ -3897,6 +4197,301 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             return result;
         }
 
+        //First One
+        //public async Task<int> IndentOrderApprovalSave(IndentOrderApprovalSaveRequest request)
+        //{
+        //    if (request == null)
+        //        throw new ArgumentNullException(nameof(request));
+
+        //    if (request.Items == null || request.Items.Count == 0)
+        //        throw new Exception("Can't Save. List is Empty.");
+
+        //    if (request.IONo <= 0)
+        //        throw new Exception("Indent Order No. is required.");
+
+        //    if (string.IsNullOrWhiteSpace(request.Branch_Code))
+        //        throw new Exception("Branch Code is required.");
+
+        //    if (string.IsNullOrWhiteSpace(request.DepCode))
+        //        throw new Exception("Department Code is required.");
+
+        //    if (string.IsNullOrWhiteSpace(request.OrderBy))
+        //        throw new Exception("Entered By is required.");
+
+        //    using var connection = _factory.CreateConnection(DbNames.POS);
+        //    connection.Open();
+        //    using var transaction = connection.BeginTransaction();
+
+
+        //    const string IndentNumberApproval = @"SELECT COUNT(1) FROM IndentOrderApprovalMaster
+        //    WHERE IONo = @IONo AND Branch_Code = @Branch_Code;";
+
+        //    int IndentnoExists = await connection.ExecuteScalarAsync<int>(
+        //        IndentNumberApproval,
+        //        new
+        //        {
+        //            IONo = request.IONo,
+        //            Branch_Code = request.Branch_Code
+        //        },
+        //        transaction);
+
+        //    if (IndentnoExists > 0)
+        //    {
+        //        throw new Exception($"Indent No already exists.");
+        //    }
+        //    try
+        //    {
+        //        const string masterSql = @"
+        //        INSERT INTO IndentOrderApprovalMaster
+        //        (
+        //            PurchaseNo,
+        //            IONo,
+        //            IODate,
+        //            SupCode,
+        //            Billed,
+        //            StoreId,
+        //            POValidDate,
+        //            Status,
+        //            Branch_Code,
+        //            OrderBy,
+        //            Approvedby,
+        //            ApprovedDate,
+        //            DepCode,
+        //            TotalAmount,
+        //            TaxAmount,
+        //            GrossAmount,
+        //            MissChargeAmount,
+        //            CgstAmount,
+        //            SgstAmount
+        //        )
+        //        VALUES
+        //        (
+        //            @PurchaseNo,
+        //            @IONo,
+        //            @IODate,
+        //            @SupCode,
+        //            @Billed,
+        //            @StoreId,
+        //            @POValidDate,
+        //            @Status,
+        //            @Branch_Code,
+        //            @OrderBy,
+        //            @ApprovedBy,
+        //            @ApprovedDate,
+        //            @DepCode,
+        //            @TotalAmount,
+        //            @TaxAmount,
+        //            @GrossAmount,
+        //            @MissChargeAmount,
+        //            @CgstAmount,
+        //            @SgstAmount
+        //        );";
+
+        //        await connection.ExecuteAsync(
+        //            masterSql,
+        //            new
+        //            {
+        //                PurchaseNo = string.Join(",", request.Items.Select(x => x.PNo.ToString())),
+        //                request.IONo,
+        //                request.IODate,
+        //                request.SupCode,
+        //                request.Billed,
+        //                request.StoreId,
+        //                request.POValidDate,
+        //                request.Status,
+        //                request.Branch_Code,
+        //                request.OrderBy,
+        //                request.ApprovedBy,
+        //                request.ApprovedDate,
+        //                request.DepCode,
+        //                request.TotalAmount,
+        //                request.TaxAmount,
+        //                request.GrossAmount,
+        //                request.MissChargeAmount,
+        //                request.CgstAmount,
+        //                request.SgstAmount,
+        //            },
+        //            transaction);
+
+        //        const string detailSql = @"
+        //            INSERT INTO IndentOrderApprovalDetail
+        //            (
+        //                PNo,
+        //                IONo,
+        //                ItemCode,
+        //                IOItemQty,
+        //                IOItemRate,
+        //                StoreId,
+        //                Branch_Code,
+        //                Unit,
+        //                UnitCode,
+        //                ApprovedBy,
+        //                ApprovedDate,
+        //                OrginalQty,
+        //                ApprovedQty,
+        //                BalanceQty,
+        //                IndentQty,
+        //                MainUnit,
+        //                MainUnitConverstion,
+        //                StockReferenceNo,
+        //                StockSource
+        //            )
+        //            VALUES
+        //            (
+        //                @PNo,
+        //                @IONo,
+        //                @ItemCode,
+        //                @IOItemQty,
+        //                @IOItemRate,
+        //                @StoreId,
+        //                @Branch_Code,
+        //                @Unit,
+        //                @UnitCode,
+        //                @ApprovedBy,
+        //                @ApprovedDate,
+        //                @OrginalQty,
+        //                @ApprovedQty,
+        //                @BalanceQty,
+        //                @IndentQty,
+        //                @MainUnit,
+        //                @MainUnitConverstion,
+        //                @StockReferenceNo,
+        //                @StockSource
+        //            );";
+
+        //        foreach (var item in request.Items)
+        //        {
+        //                const string getPOItemQtyQuery = @"SELECT ISNULL(IOORG, CAST(0 AS DECIMAL(18,2))) AS IOORG,
+        //                ISNULL(IOItemQty, CAST(0 AS DECIMAL(18,2))) AS IndentQty,
+        //                ISNULL(IndentOrderQty, CAST(0 AS DECIMAL(18,2))) AS IndentOrderQty
+        //                FROM IndentOrderDetail WHERE IONo = @IONo AND ItemCode = @ItemCode
+        //                AND Branch_Code = @Branch_Code AND PNo = @PNo;";
+
+        //                var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
+        //                    getPOItemQtyQuery,
+        //                    new
+        //                    {
+        //                        IONo = item.IONo,
+        //                        ItemCode = item.ItemCode,
+        //                        Branch_Code = request.Branch_Code,
+        //                        PNo = item.PNo
+        //                    },
+        //                    transaction
+        //                );
+
+        //                decimal OrginalQty = Convert.ToDecimal(poItem?.IOORG ?? 0);
+        //                decimal IndentQty = Convert.ToDecimal(poItem?.IndentOrderQty ?? 0);
+
+
+        //                decimal ApprovedQty = item.ApprovedQty;
+
+        //                await connection.ExecuteAsync(
+        //                    detailSql,
+        //                    new
+        //                    {
+        //                        PNo = item.PNo,
+        //                        IONo = request.IONo,
+        //                        ItemCode = item.ItemCode,
+        //                        IOItemQty = item.IOItemQty,
+        //                        IOItemRate = item.IOItemRate,
+        //                        StoreId = request.StoreId,
+        //                        Branch_Code = request.Branch_Code,
+        //                        Unit = item.Unit,
+        //                        UnitCode = item.UnitCode,
+        //                        ApprovedBy = request.ApprovedBy,
+        //                        ApprovedDate = request.ApprovedDate,
+        //                        OrginalQty = OrginalQty,
+        //                        IndentQty = IndentQty,
+        //                        ApprovedQty = item.ApprovedQty,
+        //                        BalanceQty = item.AvailableQty,
+        //                        MainUnit = item.MainUnit,
+        //                        MainUnitConverstion = item.MainUnitConverstion,
+        //                        StockReferenceNo = item.StockReferenceNo,
+        //                        StockSource = item.StockSource
+        //                    },
+        //                    transaction
+        //                );
+
+        //                const string updateDetailSql = @"UPDATE IndentOrderDetail 
+        //                SET AvailableQty = @AvailableQty,ApprovedQty = @ApprovedQty
+        //                WHERE IONo = @IONo AND ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+        //                AND PNo = @PNo;";
+
+        //                await connection.ExecuteAsync(
+        //                    updateDetailSql,
+        //                    new
+        //                    {
+        //                        IONo = request.IONo,
+        //                        ItemCode = item.ItemCode,
+        //                        AvailableQty = item.AvailableQty,
+        //                        ApprovedQty = item.ApprovedQty,
+        //                        Branch_Code = request.Branch_Code,
+        //                        PNo = item.PNo
+        //                    },
+        //                    transaction
+        //                );
+        //                if (item.PNo > 0)
+        //                {
+        //                    const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
+        //                    SET IndentApprovedQty =ISNULL(IndentApprovedQty, 0) + @IndentApprovedQty
+        //                    WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
+
+        //                    int purchaseUpdated = await connection.ExecuteAsync(
+        //                        purchaseUpdateQuery,
+        //                        new
+        //                        {
+        //                            ItemCode = item.ItemCode,
+        //                            PNo = item.PNo,
+        //                            IndentApprovedQty = item.ApprovedQty,
+        //                            BranchCode = request.Branch_Code
+        //                        },
+        //                        transaction);
+        //                }
+        //                else 
+        //                {
+        //                    const string getOpenStock = @"UPDATE Tbl_ItemOpeningStock
+        //                    SET IndentApprovalQty =ISNULL(IndentApprovalQty, 0) + @IndentApprovalQty
+        //                    WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+        //                    AND Storeid = @StoreId";
+
+        //                    var openstock = await connection.QuerySingleOrDefaultAsync<dynamic>(
+        //                        getOpenStock,
+        //                        new
+        //                        {
+        //                            ItemCode = item.ItemCode,
+        //                            Branch_Code = request.Branch_Code,
+        //                            IndentApprovalQty = item.ApprovedQty,
+        //                            Storeid = request.StoreId
+        //                        },
+        //                        transaction
+        //                    );
+        //                }
+        //        }
+        //        const string updateMasterSql = @"UPDATE IndentOrderMaster 
+        //        SET Status = @Status
+        //        WHERE IONo = @IONo AND Branch_Code = @Branch_Code;";
+
+        //        await connection.ExecuteAsync(
+        //            updateMasterSql,
+        //            new
+        //            {
+        //                request.IONo,
+        //                request.Status,
+        //                request.Branch_Code
+        //            },
+        //            transaction);
+
+        //        transaction.Commit();
+        //        return request.IONo;
+        //    }
+        //    catch
+        //    {
+        //        transaction.Rollback();
+        //        throw;
+        //    }
+        //}
+
+        //Second one
         public async Task<int> IndentOrderApprovalSave(IndentOrderApprovalSaveRequest request)
         {
             if (request == null)
@@ -3921,6 +4516,23 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             connection.Open();
             using var transaction = connection.BeginTransaction();
 
+
+            const string IndentNumberApproval = @"SELECT COUNT(1) FROM IndentOrderApprovalMaster
+            WHERE IONo = @IONo AND Branch_Code = @Branch_Code;";
+
+            int IndentnoExists = await connection.ExecuteScalarAsync<int>(
+                IndentNumberApproval,
+                new
+                {
+                    IONo = request.IONo,
+                    Branch_Code = request.Branch_Code
+                },
+                transaction);
+
+            if (IndentnoExists > 0)
+            {
+                throw new Exception($"Indent No already exists.");
+            }
             try
             {
                 const string masterSql = @"
@@ -4014,7 +4626,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         BalanceQty,
                         IndentQty,
                         MainUnit,
-                        MainUnitConverstion
+                        MainUnitConverstion,
+                        StockReferenceNo,
+                        StockSource
                     )
                     VALUES
                     (
@@ -4034,15 +4648,18 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         @BalanceQty,
                         @IndentQty,
                         @MainUnit,
-                        @MainUnitConverstion
+                        @MainUnitConverstion,
+                        @StockReferenceNo,
+                        @StockSource
                     );";
 
                 foreach (var item in request.Items)
                 {
                     const string getPOItemQtyQuery = @"SELECT ISNULL(IOORG, CAST(0 AS DECIMAL(18,2))) AS IOORG,
-                    ISNULL(IOItemQty, CAST(0 AS DECIMAL(18,2))) AS IndentQty
-                    FROM IndentOrderDetail WHERE IONo = @IONo AND ItemCode = @ItemCode
-                    AND Branch_Code = @Branch_Code;";
+                        ISNULL(IOItemQty, CAST(0 AS DECIMAL(18,2))) AS IndentQty,
+                        ISNULL(IndentOrderQty, CAST(0 AS DECIMAL(18,2))) AS IndentOrderQty
+                        FROM IndentOrderDetail WHERE IONo = @IONo AND ItemCode = @ItemCode
+                        AND Branch_Code = @Branch_Code AND PNo = @PNo;";
 
                     var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
                         getPOItemQtyQuery,
@@ -4050,70 +4667,180 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         {
                             IONo = item.IONo,
                             ItemCode = item.ItemCode,
-                            Branch_Code = request.Branch_Code
+                            Branch_Code = request.Branch_Code,
+                            PNo = item.PNo
                         },
                         transaction
                     );
 
                     decimal OrginalQty = Convert.ToDecimal(poItem?.IOORG ?? 0);
-                    decimal IndentQty = Convert.ToDecimal(poItem?.IndentQty ?? 0);
+                    decimal IndentQty = Convert.ToDecimal(poItem?.IndentOrderQty ?? 0);
+                    decimal ApprovedQty = item.ApprovedQty;
 
-                    await connection.ExecuteAsync(
-                        detailSql,
-                        new
+                    if (ApprovedQty <= 0)
+                    {
+                        const string selectIndentDetailSql = @"
+                        SELECT ISNULL(IndentOrderQty, 0) AS IndentOrderQty FROM IndentOrderDetail
+                        WHERE IONo = @IONo AND ItemCode = @ItemCode
+                        AND Branch_Code = @Branch_Code AND PNo = @PNo;";
+
+                        var selectIndent = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            selectIndentDetailSql,
+                            new
+                            {
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                PNo = item.PNo
+                            },
+                            transaction);
+
+                        decimal IndentOrderQty = Convert.ToDecimal(selectIndent?.IndentOrderQty ?? 0);
+
+                        const string resetPurchaseSql = @"UPDATE PurchaseDetail 
+                        SET IndentOrderQty =ISNULL(IndentOrderQty, 0) - @IndentOrderQty
+                        WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @Branch_Code;";
+
+                        await connection.ExecuteAsync(
+                            resetPurchaseSql,
+                            new
+                            {
+                                IndentOrderQty= IndentOrderQty,
+                                ItemCode = item.ItemCode,
+                                PNo = item.PNo,
+                                Branch_Code = request.Branch_Code
+                            },
+                            transaction);
+
+                        const string resetOpeningStockSql = @"UPDATE Tbl_ItemOpeningStock
+                        SET IndentOrderQty = ISNULL(IndentOrderQty, 0) - @IndentOrderQty  
+                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code AND Storeid = @StoreId;";
+
+                        await connection.ExecuteAsync(
+                            resetOpeningStockSql,
+                            new
+                            {
+                                IndentOrderQty = item.IOItemQty,
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                StoreId = request.StoreId
+                            },
+                            transaction);
+
+                        const string deleteIndentDetailSql = @"DELETE FROM IndentOrderDetail
+                        WHERE IONo = @IONo AND ItemCode = @ItemCode
+                        AND Branch_Code = @Branch_Code AND PNo = @PNo;";
+
+                        await connection.ExecuteAsync(
+                            deleteIndentDetailSql,
+                            new
+                            {
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                PNo = item.PNo
+                            },
+                            transaction);
+
+                        const string deleteApprovalDetailSql = @"DELETE FROM IndentOrderApprovalDetail
+                        WHERE IONo = @IONo AND ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                        AND PNo = @PNo;";
+
+                        await connection.ExecuteAsync(
+                            deleteApprovalDetailSql,
+                            new
+                            {
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                PNo = item.PNo
+                            },
+                            transaction);
+                    }
+                    else
+                    {
+                        await connection.ExecuteAsync(
+                            detailSql,
+                            new
+                            {
+                                PNo = item.PNo,
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                IOItemQty = item.IOItemQty,
+                                IOItemRate = item.IOItemRate,
+                                StoreId = request.StoreId,
+                                Branch_Code = request.Branch_Code,
+                                Unit = item.Unit,
+                                UnitCode = item.UnitCode,
+                                ApprovedBy = request.ApprovedBy,
+                                ApprovedDate = request.ApprovedDate,
+                                OrginalQty = OrginalQty,
+                                IndentQty = IndentQty,
+                                ApprovedQty = item.ApprovedQty,
+                                BalanceQty = item.AvailableQty,
+                                MainUnit = item.MainUnit,
+                                MainUnitConverstion = item.MainUnitConverstion,
+                                StockReferenceNo = item.StockReferenceNo,
+                                StockSource = item.StockSource
+                            },
+                            transaction
+                        );
+
+                        const string updateDetailSql = @"UPDATE IndentOrderDetail 
+                        SET AvailableQty = @AvailableQty,ApprovedQty = @ApprovedQty
+                        WHERE IONo = @IONo AND ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                        AND PNo = @PNo;";
+
+                        await connection.ExecuteAsync(
+                            updateDetailSql,
+                            new
+                            {
+                                IONo = request.IONo,
+                                ItemCode = item.ItemCode,
+                                AvailableQty = item.AvailableQty,
+                                ApprovedQty = item.ApprovedQty,
+                                Branch_Code = request.Branch_Code,
+                                PNo = item.PNo
+                            },
+                            transaction
+                        );
+                        if (item.PNo > 0)
                         {
-                            PNo = item.PNo,
-                            IONo = request.IONo,
-                            ItemCode = item.ItemCode,
-                            IOItemQty = item.IOItemQty,
-                            IOItemRate = item.IOItemRate,
-                            StoreId = request.StoreId,
-                            Branch_Code = request.Branch_Code,
-                            Unit = item.Unit,
-                            UnitCode = item.UnitCode,
-                            ApprovedBy = request.ApprovedBy,
-                            ApprovedDate = request.ApprovedDate,
-                            OrginalQty = OrginalQty,
-                            IndentQty = IndentQty,
-                            ApprovedQty = item.ApprovedQty,
-                            BalanceQty = item.AvailableQty,
-                            MainUnit = item.MainUnit,
-                            MainUnitConverstion = item.MainUnitConverstion
-                        },
-                        transaction
-                    );
+                            const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
+                            SET IndentApprovedQty =ISNULL(IndentApprovedQty, 0) + @IndentApprovedQty
+                            WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
 
-                    const string updateDetailSql = @"UPDATE IndentOrderDetail 
-                    SET AvailableQty = @AvailableQty,ApprovedQty = @ApprovedQty
-                    WHERE IONo = @IONo AND ItemCode = @ItemCode AND Branch_Code = @Branch_Code;";
-
-                    await connection.ExecuteAsync(
-                        updateDetailSql,
-                        new
+                            int purchaseUpdated = await connection.ExecuteAsync(
+                                purchaseUpdateQuery,
+                                new
+                                {
+                                    ItemCode = item.ItemCode,
+                                    PNo = item.PNo,
+                                    IndentApprovedQty = item.ApprovedQty,
+                                    BranchCode = request.Branch_Code
+                                },
+                                transaction);
+                        }
+                        else if (item.PNo == 0)
                         {
-                            IONo = request.IONo,
-                            ItemCode = item.ItemCode,
-                            AvailableQty = item.AvailableQty,
-                            ApprovedQty = item.ApprovedQty,
-                            Branch_Code = request.Branch_Code
-                        },
-                        transaction
-                    );
+                            const string getOpenStock = @"UPDATE Tbl_ItemOpeningStock
+                            SET IndentApprovalQty =ISNULL(IndentApprovalQty, 0) + @IndentApprovalQty
+                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                            AND Storeid = @StoreId";
 
-                    const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
-                    SET IndentApprovedQty =ISNULL(IndentApprovedQty, 0) + @IndentApprovedQty
-                    WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
-
-                    int purchaseUpdated = await connection.ExecuteAsync(
-                        purchaseUpdateQuery,
-                        new
-                        {
-                            ItemCode = item.ItemCode,
-                            PNo = item.PNo,
-                            IndentApprovedQty = item.ApprovedQty,
-                            BranchCode = request.Branch_Code
-                        },
-                        transaction);
+                            var openstock = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                                getOpenStock,
+                                new
+                                {
+                                    ItemCode = item.ItemCode,
+                                    Branch_Code = request.Branch_Code,
+                                    IndentApprovalQty = item.ApprovedQty,
+                                    Storeid = request.StoreId
+                                },
+                                transaction
+                            );
+                        }
+                    }
                 }
                 const string updateMasterSql = @"UPDATE IndentOrderMaster 
                 SET Status = @Status
@@ -4128,8 +4855,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         request.Branch_Code
                     },
                     transaction);
-                transaction.Commit();
 
+                transaction.Commit();
                 return request.IONo;
             }
             catch
@@ -4138,7 +4865,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 throw;
             }
         }
-
         public async Task<List<IndentOrderApprovalListDto>> GetIndentOrderApprovalPrintList(string branchCode, int ioNo)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
@@ -4149,8 +4875,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(M.DepCode, '') AS DepCode,ISNULL(M.CgstAmount, 0) AS CgstAmount,ISNULL(M.SgstAmount, 0) AS SgstAmount,
             ISNULL(M.MissChargeAmount, 0) AS MissChargeAmount,ISNULL(M.TotalAmount, 0) AS TotalAmount,
             ISNULL(M.TaxAmount, 0) AS TaxAmount,ISNULL(M.GrossAmount, 0) AS GrossAmount,
-            ISNULL(M.StoreId, '') AS StoreId,ISNULL(M.ApprovedDate, M.IODate) AS ApprovedDate
-            FROM IndentOrderApprovalMaster M
+            ISNULL(M.StoreId, '') AS StoreId,ISNULL(M.ApprovedDate, M.IODate) AS ApprovedDate,
+            ISNULL(M.PurchaseNo, '') AS PurchaseNo FROM IndentOrderApprovalMaster M
             WHERE M.Branch_Code = @BranchCode AND M.IONo = @IONo
             ORDER BY M.IONo DESC;
 
@@ -4161,7 +4887,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(D.OrginalQty, 0) AS OrginalQty,ISNULL(D.ApprovedQty, 0) AS ApprovedQty,
             ISNULL(D.BalanceQty, 0) AS AvailableQty,ISNULL(D.MainUnit, '') AS MainUnit,
             ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,ISNULL(D.IndentQty, 0) AS IndentQty,
-            ISNULL(I.ItemName, '') AS ItemName FROM IndentOrderApprovalDetail D
+            ISNULL(I.ItemName, '') AS ItemName,ISNULL(D.PNo, 0) AS PNo,
+            ISNULL(D.StockSource, '') AS StockSource,ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo
+            FROM IndentOrderApprovalDetail D
             LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode AND D.Branch_Code = I.Branch_Code
             WHERE D.Branch_Code = @BranchCode AND D.IONo = @IONo
             ORDER BY D.ItemCode;";
@@ -4186,7 +4914,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         }
         #endregion
 
-        #region Item issue
+        #region Item Issue
         public async Task<List<IndentOrderSearchResponse>> SearchIndentOrderAsync(string branchCode)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
@@ -4212,7 +4940,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(M.DepCode, '') AS DepCode,ISNULL(M.CgstAmount, 0) AS CgstAmount,ISNULL(M.SgstAmount, 0) AS SgstAmount,
             ISNULL(M.MissChargeAmount, 0) AS MissChargeAmount,ISNULL(M.TotalAmount, 0) AS TotalAmount,
             ISNULL(M.TaxAmount, 0) AS TaxAmount,ISNULL(M.GrossAmount, 0) AS GrossAmount,
-            ISNULL(M.StoreId, '') AS StoreId,ISNULL(M.ApprovedDate, M.IODate) AS ApprovedDate
+            ISNULL(M.StoreId, '') AS StoreId,ISNULL(M.ApprovedDate, M.IODate) AS ApprovedDate,
+            ISNULL(M.PurchaseNo, '') AS PurchaseNo
             FROM IndentOrderApprovalMaster M
             WHERE M.Branch_Code = @BranchCode AND M.IONo = @IONo
             ORDER BY M.IONo DESC;
@@ -4223,8 +4952,10 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(D.ApprovedBy, '') AS ApprovedBy,ISNULL(D.ApprovedDate, GETDATE()) AS ApprovedDate,
             ISNULL(D.OrginalQty, 0) AS OrginalQty,ISNULL(D.ApprovedQty, 0) AS ApprovedQty,
             ISNULL(D.BalanceQty, 0) AS AvailableQty,ISNULL(D.MainUnit, '') AS MainUnit,
-            ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
-            ISNULL(I.ItemName, '') AS ItemName
+            ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,ISNULL(D.PNo, 0) AS PNo,
+            ISNULL(I.ItemName, '') AS ItemName,ISNULL(D.StockSource, '') AS StockSource,
+            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,ISNULL(I.ItemName, '') AS ItemName,
+            ISNULL(d.ApprovedQty, 0) - ISNULL(d.IssuedQty, 0) + ISNULL(d.ItemReturnQty, 0) AS ReamingQty
             FROM IndentOrderApprovalDetail D
             LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode AND D.Branch_Code = I.Branch_Code
             WHERE D.Branch_Code = @BranchCode AND D.IONo = @IONo
@@ -4245,7 +4976,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 Master = master,
                 Details = details.Where(x => x.IONo == master.IONo && x.BranchCode == master.Branch_Code).ToList()
             }).ToList();
-
             return result;
         }
 
@@ -4275,8 +5005,10 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     IType,
                     Branch_Code,
                     UserCode,
-                    StoreId,
-                    Status
+                    StoredId,
+                    Status,
+                    TrasnsactionNo,
+                    IndentNo
                 )
                 VALUES
                 (
@@ -4290,8 +5022,10 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     @IType,
                     @Branch_Code,
                     @UserCode,
-                    @StoreId,
-                    @Status
+                    @StoredId,
+                    @Status,
+                    @TrasnsactionNo,
+                    @IndentNo
                 )";
 
                 await connection.ExecuteAsync(
@@ -4304,12 +5038,14 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         ITotalAmount = request.TotalAmount,
                         BillNo = request.BillNo,
                         DIssue = 0,
-                        PNO = 0,
+                        PNO = request.PNo,
                         IType = request.IssueType,
                         Branch_Code = request.Branch_Code,
                         UserCode = request.UserCode,
-                        StoreId = request.StoreId,
-                        Status= request.Status
+                        StoredId = request.StoreId,
+                        Status= request.Status,
+                        TrasnsactionNo=request.TrasnsactionNo,
+                        IndentNo=request.IndentNo
                     },
                     transaction);
 
@@ -4319,6 +5055,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     INo,
                     ItemCode,
                     IItemQty,
+                    IssuedQty,
                     IItemRate,
                     unit,
                     UnitCode,
@@ -4333,13 +5070,19 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     MainUnit,
                     IItemReturnQty,
                     AvailableQty,
-                    ReturnQty
+                    ReturnQty,
+                    StockReferenceNo,
+                    StockSource,
+                    TrasnsactionNo,
+                    OrginalQty,
+                    IndentNo
                 )
                 VALUES
                 (
                     @INo,
                     @ItemCode,
                     @IItemQty,
+                    @IssuedQty,
                     @IItemRate,
                     @Unit,
                     @UnitCode,
@@ -4354,7 +5097,12 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     @MainUnit,
                     @IItemReturnQty,
                     @AvailableQty,
-                    @ReturnQty
+                    @ReturnQty,
+                    @StockReferenceNo,
+                    @StockSource,
+                    @TrasnsactionNo,
+                    @OrginalQty,
+                    @IndentNo
                 )";
 
                 foreach (var item in request.Items)
@@ -4366,11 +5114,12 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             INo = request.INo,
                             ItemCode = item.ItemCode,
                             IItemQty = Math.Round(item.IssueQty, 2),
+                            IssuedQty = Math.Round(item.IssueQty, 2),
                             IItemRate = Math.Round(item.ItemRate, 2),
                             Unit = item.Unit,
                             UnitCode = item.UnitCode,
                             PerRate = Math.Round(item.ItemRate, 2),
-                            PNo = 0,
+                            PNo = item.PNo,
                             BranchCode = request.Branch_Code,
                             QtyPer = item.QtyPer,
                             NoOfQty = item.NoOfQty,
@@ -4380,7 +5129,12 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             MainUnitConverstion = item.MainUnitConverstion,
                             IItemReturnQty = item.ReturnQty,
                             AvailableQty = item.AvailableQty,
-                            ReturnQty = item.ReturnQty
+                            ReturnQty = item.ReturnQty,
+                            StockReferenceNo = item.StockReferenceNo,
+                            StockSource = item.StockSource,
+                            TrasnsactionNo=request.TrasnsactionNo,
+                            OrginalQty= item.OrginalQty,
+                            IndentNo= request.IndentNo
                         },
                         transaction);
 
@@ -4422,6 +5176,64 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             },
                             transaction);
                     }
+
+                    if (item.IssueQty > 0)
+                    {
+                        const string getOpenStock = @"UPDATE IndentOrderApprovalDetail
+                            SET IssuedQty =ISNULL(IssuedQty, 0) + @IssuedQty
+                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                            AND Storeid = @StoreId and PNo=@PNo and IONo=@IONo";
+
+                        var openstock = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            getOpenStock,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                IssuedQty = item.IssueQty,
+                                Storeid = request.StoreId,
+                                PNo = item.PNo,
+                                IONo = item.INo,
+                            },
+                            transaction
+                        );
+                    }
+                    if (item.StockSource.ToLower() == "purchasestock" && item.PNo > 0)
+                    {
+                        const string purchaseUpdateQuery = @"UPDATE PurchaseDetail
+                        SET IssuedQty =ISNULL(IssuedQty, 0) + @IssuedQty
+                        WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
+
+                        int purchaseUpdated = await connection.ExecuteAsync(
+                            purchaseUpdateQuery,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                PNo = item.PNo,
+                                IssuedQty = item.IssueQty,
+                                BranchCode = request.Branch_Code
+                            },
+                        transaction);
+                    }
+                    else if(item.PNo == 0)
+                    {
+                        const string getPOItemQtyQuery = @"UPDATE Tbl_ItemOpeningStock
+                        SET IssuedQty =ISNULL(IssuedQty, 0) + @IssuedQty
+                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                        AND Storeid = @StoreId";
+
+                        var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            getPOItemQtyQuery,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.Branch_Code,
+                                IssuedQty = item.IssueQty,
+                                Storeid = request.StoreId
+                            },
+                            transaction
+                        );
+                    }
                 }
 
                 const string indentStatusSql = @"UPDATE IndentOrderApprovalMaster
@@ -4455,15 +5267,16 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             M.INo,
             M.IDate,
             ISNULL(M.DepCode, '') AS DepCode,
-            ISNULL(M.ITotalAmount, 0) AS ITotalAmount,
+            ISNULL(M.ITotalAmount, 0) AS TotalAmount,
             ISNULL(M.Billno, '') AS BillNo,
-            ISNULL(M.Branch_Code, '') AS BranchCode,
+            ISNULL(M.Branch_Code, '') AS Branch_Code,
             ISNULL(M.DIssue, 0) AS DIssue,
             ISNULL(M.UserCode, '') AS UserCode,
             ISNULL(M.PNO, 0) AS PNO,
             ISNULL(M.IType, '') AS IssueType,
-            ISNULL(M.StoreId, '') AS StoreId,
-            ISNULL(M.Status, '') AS Status
+            ISNULL(M.StoredId, '') AS StoreId,
+            ISNULL(M.Status, '') AS Status,
+            ISNULL(M.TrasnsactionNo, '') AS TrasnsactionNo
         FROM ItemIssueMaster M
         WHERE M.Branch_Code = @BranchCode
           AND M.INo = @INo
@@ -4472,23 +5285,25 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         SELECT
             D.INo,
             D.ItemCode,
+            ISNULL(I.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             ISNULL(D.UnitCode, 0) AS UnitCode,
-            ISNULL(D.IItemQty, 0) AS IssueQty,
+            ISNULL(D.IssuedQty, 0) AS IssueQty,
             ISNULL(D.IItemRate, 0) AS ItemRate,
             ISNULL(D.PerRate, 0) AS PerRate,
             ISNULL(D.PNo, 0) AS PNo,
-            ISNULL(D.Branch_Code, '') AS BranchCode,
+            ISNULL(D.Branch_Code, '') AS Branch_Code,
             ISNULL(D.QtyPer, 0) AS QtyPer,
             ISNULL(D.NoOfQty, 0) AS NoOfQty,
             ISNULL(D.StoreId, '') AS StoreId,
-            ISNULL(D.DepCode, '') AS DepCode,
-            ISNULL(I.ItemName, '') AS ItemName,
+            ISNULL(D.DepCode, 0) AS DepCode,
             ISNULL(D.MainUnit, '') AS MainUnit,
             ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
             ISNULL(D.ReturnQty, 0) AS ReturnQty,
             ISNULL(D.AvailableQty, 0) AS AvailableQty,
-            ISNULL(D.ReturnQty, 0) AS ReturnQty,
+            ISNULL(D.OrginalQty, 0) AS OrginalQty,
+            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
+            ISNULL(D.StockSource, '') AS StockSource
         FROM ItemIssueDetail D
         LEFT JOIN InventoryItemMaster I
             ON D.ItemCode = I.ItemCode
@@ -4534,15 +5349,16 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             M.INo,
             M.IDate,
             ISNULL(M.DepCode, '') AS DepCode,
-            ISNULL(M.ITotalAmount, 0) AS ITotalAmount,
+            ISNULL(M.ITotalAmount, 0) AS TotalAmount,
             ISNULL(M.Billno, '') AS BillNo,
-            ISNULL(M.Branch_Code, '') AS BranchCode,
+            ISNULL(M.Branch_Code, '') AS Branch_Code,
             ISNULL(M.DIssue, 0) AS DIssue,
             ISNULL(M.UserCode, '') AS UserCode,
             ISNULL(M.PNO, 0) AS PNO,
             ISNULL(M.IType, '') AS IssueType,
-            ISNULL(M.StoreId, '') AS StoreId,
-            ISNULL(M.Status, '') AS Status
+            ISNULL(M.StoredId, '') AS StoreId,
+            ISNULL(M.Status, '') AS Status,
+            ISNULL(M.TrasnsactionNo, '') AS TrasnsactionNo
         FROM ItemIssueMaster M
         WHERE M.Branch_Code = @BranchCode
         ORDER BY M.INo DESC;
@@ -4550,23 +5366,25 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         SELECT
             D.INo,
             D.ItemCode,
+            ISNULL(I.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             ISNULL(D.UnitCode, 0) AS UnitCode,
-            ISNULL(D.IItemQty, 0) AS IssueQty,
+            ISNULL(D.IssuedQty, 0) AS IssueQty,
             ISNULL(D.IItemRate, 0) AS ItemRate,
             ISNULL(D.PerRate, 0) AS PerRate,
             ISNULL(D.PNo, 0) AS PNo,
-            ISNULL(D.Branch_Code, '') AS BranchCode,
+            ISNULL(D.Branch_Code, '') AS Branch_Code,
             ISNULL(D.QtyPer, 0) AS QtyPer,
             ISNULL(D.NoOfQty, 0) AS NoOfQty,
             ISNULL(D.StoreId, '') AS StoreId,
-            ISNULL(D.DepCode, '') AS DepCode,
-            ISNULL(I.ItemName, '') AS ItemName,
+            ISNULL(D.DepCode, 0) AS DepCode,
             ISNULL(D.MainUnit, '') AS MainUnit,
             ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
             ISNULL(D.ReturnQty, 0) AS ReturnQty,
             ISNULL(D.AvailableQty, 0) AS AvailableQty,
-            ISNULL(D.ReturnQty, 0) AS ReturnQty,
+            ISNULL(D.OrginalQty, 0) AS OrginalQty,
+            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
+            ISNULL(D.StockSource, '') AS StockSource
         FROM ItemIssueDetail D
         LEFT JOIN InventoryItemMaster I
             ON D.ItemCode = I.ItemCode
@@ -4599,6 +5417,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
 
             return result;
         }
+
         public async Task<int> ItemIssueReturnSave(ItemIssueReturnSaveRequest request)
         {
             if (request == null)
@@ -4620,30 +5439,30 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             try
             {
                 const string masterSql = @"
-            INSERT INTO ItemIssueReturnMaster
-            (
-                IRNo,
-                IRDate,
-                DepCode,
-                IRTotalAmount,
-                Branch_Code,
-                Status,
-                IType,
-                StoredId,
-                DeptCode
-            )
-            VALUES
-            (
-                @IRNo,
-                @IRDate,
-                @DepCode,
-                @IRTotalAmount,
-                @BranchCode,
-                @Status,
-                @IType,
-                @StoredId,
-                @DeptCode
-            )";
+                INSERT INTO ItemIssueReturnMaster
+                (
+                    IRNo,
+                    IRDate,
+                    DepCode,
+                    IRTotalAmount,
+                    Branch_Code,
+                    Status,
+                    IType,
+                    StoredId,
+                    DeptCode
+                )
+                VALUES
+                (
+                    @IRNo,
+                    @IRDate,
+                    @DepCode,
+                    @IRTotalAmount,
+                    @BranchCode,
+                    @Status,
+                    @IType,
+                    @StoredId,
+                    @DeptCode
+                )";
 
                 await connection.ExecuteAsync(
                     masterSql,
@@ -4651,7 +5470,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     {
                         request.IRNo,
                         IRDate = request.IRDate,
-                        DepCode = 0,
+                        DepCode = request.DeptCode,
                         request.IRTotalAmount,
                         BranchCode = request.BranchCode,
                         Status = request.Status,
@@ -4664,10 +5483,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
 
                 foreach (var item in request.Items)
                 {
-
-                    const string issueQtySql = @"
-                SELECT isnull(IItemQty, 0) as  IItemQty FROM ItemIssueDetail
-                WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
+                    const string issueQtySql = @"SELECT isnull(IItemQty, 0) as  IItemQty FROM ItemIssueDetail
+                    WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
 
                     decimal? balanceQty = await connection.ExecuteScalarAsync<decimal?>(
                         issueQtySql,
@@ -4683,65 +5500,84 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     decimal OriginalQty = balanceQty ?? 0m;
 
                     const string detailSql = @"
-                INSERT INTO ItemIssueReturnDetail
-                (
-                    IRNo,
-                    INo,
-                    ItemCode,
-                    IRItemRate,
-                    IRItemQty,
-                    IRNoofQty,
-                    Branch_Code,
-                    PNO,
-                    StoredId,
-                    ReturnQty,
-                    AvailableQty,
-                    DeptCode,
-                    OriginalQty
+                    INSERT INTO ItemIssueReturnDetail
+                    (
+                        IRNo,
+                        INo,
+                        ItemCode,
+                        IRItemRate,
+                        IRItemQty,
+                        IRNoofQty,
+                        Branch_Code,
+                        PNO,
+                        StoredId,
+                        ReturnQty,
+                        AvailableQty,
+                        DeptCode,
+                        OriginalQty,
+                        UnitCode,
+                        Unit,
+                        MainUnit,
+                        MainUnitConverstion
+                        StockReferenceNo,
+                        StockSource,
+                        IndentNo
+                    )
+                    VALUES
+                    (
+                        @IRNo,
+                        @INo,
+                        @ItemCode,
+                        @IRItemRate,
+                        @IRItemQty,
+                        @IRNoofQty,
+                        @BranchCode,
+                        @PNo,
+                        @StoredId,
+                        @ReturnQty,
+                        @AvailableQty,
+                        @DeptCode,
+                        @OriginalQty,
+                        @UnitCode,
+                        @Unit,
+                        @MainUnit,
+                        @MainUnitConverstion,
+                        @StockReferenceNo,
+                        @StockSource,
+                        @IndentNo
 
-                )
-                VALUES
-                (
-                    @IRNo,
-                    @INo,
-                    @ItemCode,
-                    @IRItemRate,
-                    @IRItemQty,
-                    @IRNoofQty,
-                    @BranchCode,
-                    @PNo,
-                    @StoredId,
-                    @ReturnQty,
-                    @AvailableQty,
-                    @DeptCode,
-                    @OriginalQty
-
-                )";
+                    )";
 
                     await connection.ExecuteAsync(
                         detailSql,
                         new
                         {
-                            request.IRNo,
-                            item.INo,
-                            item.ItemCode,
-                            item.IRItemRate,
-                            item.IRItemQty,
-                            item.IRNoofQty,
-                            request.BranchCode,
-                            item.PNo,
-                            request.StoredId,
+                            IRNo=request.IRNo,
+                            INo=item.INo,
+                            ItemCode=item.ItemCode,
+                            IRItemRate=item.IRItemRate,
+                            IRItemQty=item.IRItemQty,
+                            IRNoofQty=item.IRNoofQty,
+                            BranchCode=request.BranchCode,
+                            PNo=item.PNo,
+                            StoredId=request.StoredId,
                             ReturnQty = item.ReturnQty,
                             AvailableQty = item.AvailableQty,
                             DeptCode = request.DeptCode,
-                            OriginalQty= OriginalQty
+                            OriginalQty= OriginalQty,
+                            UnitCode= item.UnitCode,
+                            Unit=item.Unit,
+                            MainUnit = item.MainUnit,
+                            MainUnitConverstion = item.MainUnitConverstion,
+                            StockReferenceNo = item.StockReferenceNo,
+                            StockSource = item.StockSource,
+                            IndentNo=item.IndentNo
 
                         },
                         transaction);
 
                     const string issueDetailSql = @" UPDATE ItemIssueDetail SET
                     IItemReturnQty =ISNULL(IItemReturnQty, 0) + @IRItemQty,
-                    IIRNoQty = ISNULL(IIRNoQty, 0) + @IssueQty,
                     AvailableQty =ISNULL(AvailableQty, 0) + @AvailableQty,
                     ReturnQty = ISNULL(ReturnQty, 0) + @ReturnQty
                     WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo
@@ -4752,7 +5588,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         new
                         {
                             IRItemQty = item.IRItemQty,
-                            IssueQty = item.IRNoofQty,
                             ReturnQty = item.ReturnQty,
                             AvailableQty = item.AvailableQty,
                             item.INo,
@@ -4762,27 +5597,70 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         },
                         transaction);
 
+                    if (item.ReturnQty > 0)
+                    {
+                        const string getOpenStock = @"UPDATE IndentOrderApprovalDetail
+                            SET ItemReturnQty =ISNULL(ItemReturnQty, 0) + @ReturnQty
+                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                            AND Storeid = @StoreId and PNo=@PNo and IONo=@IONo";
+
+                        var openstock = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            getOpenStock,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.BranchCode,
+                                ReturnQty = item.ReturnQty,
+                                Storeid = request.StoredId,
+                                PNo = item.PNo,
+                                IONo = item.INo,
+                            },
+                            transaction
+                        );
+                    }
+
                     if (issueUpdated == 0)
                     {
                         throw new Exception(
                             $"ItemIssueDetail not found. Issue No: {item.INo}, Item: {item.ItemCode}");
                     }
+                    if (item.StockSource.ToLower() == "purchase" && item.PNo > 0)
+                    {
+                        const string purchaseDetailSql = @"UPDATE PurchaseDetail SET 
+                        IssuedReturnQty =ISNULL(IssuedReturnQty, 0) - @ReturnQty
+                        WHERE ItemCode = @ItemCode AND PNO = @PNo
+                        AND Branch_Code = @BranchCode";
 
-                    const string purchaseDetailSql = @"UPDATE PurchaseDetail SET 
-                    PItemReturnQty =ISNULL(PItemReturnQty, 0) - @ReturnQty
-                    WHERE ItemCode = @ItemCode AND PNO = @PNo
-                    AND Branch_Code = @BranchCode";
+                        await connection.ExecuteAsync(
+                            purchaseDetailSql,
+                            new
+                            {
+                                ReturnQty = item.ReturnQty,
+                                item.ItemCode,
+                                item.PNo,
+                                request.BranchCode
+                            },
+                            transaction);
+                    }
+                    else if (item.PNo == 0)
+                    {
+                        const string getPOItemQtyQuery = @"UPDATE Tbl_ItemOpeningStock
+                        SET IssuedReturnQty =ISNULL(IssuedReturnQty, 0) + @IssuedReturnQty
+                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                        AND Storeid = @StoreId";
 
-                    await connection.ExecuteAsync(
-                        purchaseDetailSql,
-                        new
-                        {
-                            ReturnQty = item.IRItemQty,
-                            item.ItemCode,
-                            item.PNo,
-                            request.BranchCode
-                        },
-                        transaction);
+                        var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                            getPOItemQtyQuery,
+                            new
+                            {
+                                ItemCode = item.ItemCode,
+                                Branch_Code = request.BranchCode,
+                                IssuedReturnQty = item.ReturnQty,
+                                Storeid = request.StoredId
+                            },
+                            transaction
+                        );
+                    }
                 }
                 transaction.Commit();
                 return request.IRNo;
@@ -4793,6 +5671,291 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 throw;
             }
         }
-        #endregion Item Issue Return
+
+        public async Task<List<ItemIssueListDto>> GetItemIssueReturnPrintData(string branchCode, int iNo)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            const string query = @"SELECT
+            M.INo,
+            M.IDate,
+            ISNULL(M.DepCode, '') AS DepCode,
+            ISNULL(M.ITotalAmount, 0) AS ITotalAmount,
+            ISNULL(M.Billno, '') AS BillNo,
+            ISNULL(M.Branch_Code, '') AS BranchCode,
+            ISNULL(M.DIssue, 0) AS DIssue,
+            ISNULL(M.UserCode, '') AS UserCode,
+            ISNULL(M.PNO, 0) AS PNO,
+            ISNULL(M.IType, '') AS IssueType,
+            ISNULL(M.StoreId, '') AS StoreId,
+            ISNULL(M.Status, '') AS Status
+        FROM ItemIssueReturnMaster M
+        WHERE M.Branch_Code = @BranchCode
+          AND M.INo = @INo
+        ORDER BY M.INo DESC;
+
+        SELECT
+            D.INo,
+            D.ItemCode,
+            ISNULL(D.Unit, '') AS Unit,
+            ISNULL(D.UnitCode, 0) AS UnitCode,
+            ISNULL(D.IItemQty, 0) AS IssueQty,
+            ISNULL(D.IItemRate, 0) AS ItemRate,
+            ISNULL(D.PerRate, 0) AS PerRate,
+            ISNULL(D.PNo, 0) AS PNo,
+            ISNULL(D.Branch_Code, '') AS BranchCode,
+            ISNULL(D.QtyPer, 0) AS QtyPer,
+            ISNULL(D.NoOfQty, 0) AS NoOfQty,
+            ISNULL(D.StoreId, '') AS StoreId,
+            ISNULL(D.DepCode, '') AS DepCode,
+            ISNULL(I.ItemName, '') AS ItemName,
+            ISNULL(D.MainUnit, '') AS MainUnit,
+            ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
+            ISNULL(D.ReturnQty, 0) AS ReturnQty,
+            ISNULL(D.AvailableQty, 0) AS AvailableQty,
+            ISNULL(D.ReturnQty, 0) AS ReturnQty,
+            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
+            ISNULL(D.StockSource, '') AS StockSource
+        FROM ItemIssueReturnDetail D
+        LEFT JOIN InventoryItemMaster I
+            ON D.ItemCode = I.ItemCode
+           AND D.Branch_Code = I.Branch_Code
+        WHERE D.Branch_Code = @BranchCode
+          AND D.INo = @INo
+        ORDER BY D.ItemCode;";
+
+            using var multi = await connection.QueryMultipleAsync(
+                query,
+                new
+                {
+                    BranchCode = branchCode,
+                    INo = iNo
+                });
+
+            var masters = (await multi.ReadAsync<ItemIssueList>()).ToList();
+
+            var items = (await multi.ReadAsync<ItemIssueDetailRequest>()).ToList();
+
+            var result = masters.Select(master => new ItemIssueListDto
+            {
+                Master = master,
+
+                Items = items
+                    .Where(x =>
+                        x.INo == master.INo &&
+                        x.Branch_Code == master.Branch_Code)
+                    .ToList()
+
+            }).ToList();
+
+            return result;
+        }
+        #endregion
+
+        #region Opening Stock
+        public async Task<List<ItemOpeningStock>> GetOpeningStockListAsync(string branchCode, int storeId)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            const string sql = @"
+            SELECT
+                OpeningStockId,
+                ItemCode,
+                StoreId,
+                DeptCode,
+                Branch_Code,
+                StockDate,
+                OpeningQty,
+                UnitCode,
+                UnitName,
+                BaseOpeningQty,
+                BaseUnitCode,
+                BaseUnitName,
+                ClosingQty,
+                OpeningRate,
+                IsActive,
+                CreatedBy,
+                CreatedDate,
+                ModifiedBy,
+                ModifiedDate
+            FROM Tbl_ItemOpeningStock
+            WHERE Branch_Code = @BranchCode
+              AND StoreId = @StoreId
+              AND IsActive = 1
+            ORDER BY OpeningStockId DESC;";
+
+            var result = await connection.QueryAsync<ItemOpeningStock>(
+                sql,
+                new
+                {
+                    BranchCode = branchCode,
+                    StoreId = storeId
+                });
+
+            return result.ToList();
+        }
+        public async Task<int> SaveOpeningStockAsync(ItemOpeningStock request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (request.ItemCode <= 0)
+                throw new Exception("Item code is required.");
+
+            if (request.StoreId <= 0)
+                throw new Exception("Store is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Branch_Code))
+                throw new Exception("Branch code is required.");
+
+            if (request.OpeningQty < 0)
+                throw new Exception("Opening quantity cannot be negative.");
+
+            if (request.BaseOpeningQty < 0)
+                throw new Exception("Base opening quantity cannot be negative.");
+
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            // Check whether opening stock already exists
+            const string checkSql = @"
+            SELECT COUNT(1)
+            FROM Tbl_ItemOpeningStock
+            WHERE ItemCode = @ItemCode
+              AND StoreId = @StoreId
+              AND Branch_Code = @Branch_Code
+              AND StockDate = @StockDate
+              AND IsActive = 1;";
+
+            var exists = await connection.ExecuteScalarAsync<int>(
+                checkSql,
+                new
+                {
+                    request.ItemCode,
+                    request.StoreId,
+                    request.Branch_Code,
+                    request.StockDate
+                });
+
+            if (exists > 0)
+                throw new Exception(
+                    "Opening stock already exists for this item, store and date.");
+
+            const string sql = @"
+            INSERT INTO Tbl_ItemOpeningStock
+            (
+                ItemCode,
+                StoreId,
+                DeptCode,
+                Branch_Code,
+                StockDate,
+                OpeningQty,
+                UnitCode,
+                UnitName,
+                BaseOpeningQty,
+                BaseUnitCode,
+                BaseUnitName,
+                ClosingQty,
+                OpeningRate,
+                IsActive,
+                CreatedBy,
+                CreatedDate
+            )
+            VALUES
+            (
+                @ItemCode,
+                @StoreId,
+                @DeptCode,
+                @Branch_Code,
+                @StockDate,
+                @OpeningQty,
+                @UnitCode,
+                @UnitName,
+                @BaseOpeningQty,
+                @BaseUnitCode,
+                @BaseUnitName,
+                @OpeningQty,
+                @OpeningRate,
+                1,
+                @CreatedBy,
+                GETDATE()
+            );
+
+            SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+            return await connection.ExecuteScalarAsync<int>(
+                sql,
+                request);
+        }
+        public async Task<bool> UpdateOpeningStockAsync(ItemOpeningStock request)
+        {
+
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            const string sql = @"
+            UPDATE Tbl_ItemOpeningStock
+            SET
+                ItemCode = @ItemCode,
+                StoreId = @StoreId,
+                DeptCode = @DeptCode,
+                Branch_Code = @Branch_Code,
+                StockDate = @StockDate,
+                OpeningQty = @OpeningQty,
+                UnitCode = @UnitCode,
+                UnitName = @UnitName,
+                BaseOpeningQty = @BaseOpeningQty,
+                BaseUnitCode = @BaseUnitCode,
+                BaseUnitName = @BaseUnitName,
+                OpeningRate = @OpeningRate,
+                ModifiedBy = @ModifiedBy,
+                ModifiedDate = GETDATE()
+                WHERE OpeningStockId = @OpeningStockId
+                AND IsActive = 1;";
+
+            var rows = await connection.ExecuteAsync(
+                sql,
+                new
+                {
+                    request.OpeningStockId,
+                    request.ItemCode,
+                    request.StoreId,
+                    request.DeptCode,
+                    request.Branch_Code,
+                    request.StockDate,
+                    request.OpeningQty,
+                    request.UnitCode,
+                    request.UnitName,
+                    request.BaseOpeningQty,
+                    request.BaseUnitCode,
+                    request.BaseUnitName,
+                    request.OpeningRate,
+                    ModifiedBy = request.CreatedBy
+                });
+
+            return rows > 0;
+        }
+        public async Task<bool> DeleteOpeningStockAsync(int openingStockId,int modifiedBy)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            const string sql = @"
+            UPDATE Tbl_ItemOpeningStock
+            SET
+                IsActive = 0,
+                ModifiedBy = @ModifiedBy,
+                ModifiedDate = GETDATE()
+            WHERE OpeningStockId = @OpeningStockId
+              AND IsActive = 1;";
+
+            var rows = await connection.ExecuteAsync(
+                sql,
+                new
+                {
+                    OpeningStockId = openingStockId,
+                    ModifiedBy = modifiedBy
+                });
+
+            return rows > 0;
+        }
+        #endregion
     }
 }
