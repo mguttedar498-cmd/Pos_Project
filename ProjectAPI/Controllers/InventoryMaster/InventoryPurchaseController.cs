@@ -717,15 +717,15 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
         }
 
         [HttpGet("GetItemIssuePrintData")]
-        public async Task<IActionResult?> GetItemIssuePrintData([FromQuery] string BranchCode, [FromQuery] int ItemissueNo)
+        public async Task<IActionResult?> GetItemIssuePrintData([FromQuery] string BranchCode, [FromQuery] int issueNo)
         {
             if (string.IsNullOrWhiteSpace(BranchCode))
                 return Fail("Branch code is required");
 
-            if (ItemissueNo <=0 )
+            if (issueNo <= 0 )
                 return Fail("Invalid Item Issue No.");
 
-            var result = await _service.GetItemIssuePrintData(BranchCode, ItemissueNo);
+            var result = await _service.GetItemIssuePrintData(BranchCode, issueNo);
 
             return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
                 "Item issue data retrieved successfully"));
@@ -733,13 +733,24 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
         #endregion
 
         #region Item Issue Return Data
-        [HttpGet("GetItemIssueData")]
-        public async Task<IActionResult?> GetItemIssueData([FromQuery] string BranchCode)
+        [HttpGet("GetItemIssueNumber")]
+        public async Task<IActionResult?> GetItemIssueNumber([FromQuery] string BranchCode)
         {
             if (string.IsNullOrWhiteSpace(BranchCode))
                 return Fail("Branch code is required");
 
-            var result = await _service.GetItemIssueData(BranchCode);
+            var result = await _service.GetItemIssueNumber(BranchCode);
+
+            return Ok(ApiResponse<List<ItemIssueReturnNumber>>.SuccessResult(result,
+                "Item issue data retrieved successfully"));
+        }
+        [HttpGet("GetItemIssueData")]
+        public async Task<IActionResult?> GetItemIssueData([FromQuery] string BranchCode, [FromQuery] int ItemNo)
+        {
+            if (string.IsNullOrWhiteSpace(BranchCode))
+                return Fail("Branch code is required");
+
+            var result = await _service.GetItemIssueData(BranchCode, ItemNo);
 
             return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
                 "Item issue data retrieved successfully"));
@@ -761,17 +772,17 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
         }
 
         [HttpGet("GetItemIssueReturnPrintData")]
-        public async Task<IActionResult?> GetItemIssueReturnPrintData([FromQuery] string BranchCode, [FromQuery] int iNo)
+        public async Task<IActionResult?> GetItemIssueReturnPrintData([FromQuery] string BranchCode, [FromQuery] int IRNo)
         {
             if (string.IsNullOrWhiteSpace(BranchCode))
                 return Fail("Branch code is required");
 
-            if (iNo <= 0)
+            if (IRNo <= 0)
                 return Fail("Invalid Item Issue Return No.");
 
-            var result = await _service.GetItemIssueReturnPrintData(BranchCode, iNo);
+            var result = await _service.GetItemIssueReturnPrintData(BranchCode, IRNo);
 
-            return Ok(ApiResponse<List<ItemIssueListDto>>.SuccessResult(result,
+            return Ok(ApiResponse<List<ItemIssueReturnListDto>>.SuccessResult(result,
                 "Item issue return data retrieved successfully"));
         }
         #endregion
@@ -829,5 +840,26 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
         //        "Opening stock deleted successfully")); 
         //}
         //#endregion
+
+        [HttpPost("GetStockReport")]
+        public async Task<IActionResult> GetStockReport([FromBody] StockReportRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (request.FromDate.Date > request.ToDate.Date)
+                throw new Exception("From date cannot be greater than To date.");
+
+            if (string.IsNullOrWhiteSpace(request.BranchCode))
+                throw new Exception("Branch code is required.");
+
+            if (request.StoreId <= 0)
+                throw new Exception("Store is required.");
+
+            var result =await _service.GetStockReportAsync(request);
+
+            return Ok(ApiResponse<List<StockReportResponse>>.SuccessResult(
+            result,"Stock report retrieved successfully."));
+        }
     }
 }

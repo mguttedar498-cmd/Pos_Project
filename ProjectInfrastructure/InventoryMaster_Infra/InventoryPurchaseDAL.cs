@@ -2128,7 +2128,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 MainUnitConverstion,
                                 StoreId,
                                 TrasnsactionNo,
-                                OrginalQty
+                                OrginalQty,
+                                IType
                             )
                             VALUES
                             (
@@ -2152,7 +2153,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 @MainUnit,
                                 @MainUnitConverstion,
                                 @TrasnsactionNo,
-                                @OrginalQty
+                                @OrginalQty,
+                                @IType
                             )";
 
                         await connection.ExecuteAsync(
@@ -2179,7 +2181,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 ReturnQty = 0,
                                 MainUnit = item.MainUnit,
                                 MainUnitConverstion = item.MainUnitConverstion,
-                                TrasnsactionNo= request.PNo
+                                TrasnsactionNo= request.PNo,
+                                IType = "DirectIssue",
                             },
                             transaction);
                     }
@@ -3608,10 +3611,10 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             const string itemSql = @"SELECT pd.PNo, pd.PONo,i.ItemCode,i.ItemName,ISNULL(pd.PItemRate, 0) AS ItemRate,
             CASE WHEN (ISNULL(pd.PItemQty, 0) - ISNULL(pd.PItemReturnQty, 0) - ISNULL(pd.DamageQty, 0)- 
             CASE WHEN ISNULL(pd.IndentApprovedQty, 0) > 0
-            THEN ISNULL(pd.IndentApprovedQty, 0) ELSE ISNULL(pd.IndentOrderQty, 0) END) < 0 THEN 0 
-            ELSE (ISNULL(pd.PItemQty, 0) - ISNULL(pd.PItemReturnQty, 0) - ISNULL(pd.DamageQty, 0) - 
+            THEN ISNULL(pd.IndentApprovedQty, 0) ELSE ISNULL(pd.IndentOrderQty, 0) END + ISNULL(pd.IssuedReturnQty, 0)) 
+            < 0 THEN 0 ELSE (ISNULL(pd.PItemQty, 0) - ISNULL(pd.PItemReturnQty, 0) - ISNULL(pd.DamageQty, 0) - 
             CASE WHEN ISNULL(pd.IndentApprovedQty, 0) > 0 THEN ISNULL(pd.IndentApprovedQty, 0) 
-            ELSE ISNULL(pd.IndentOrderQty, 0) END) END AS AvailableQty,
+            ELSE ISNULL(pd.IndentOrderQty, 0) END + ISNULL(pd.IssuedReturnQty, 0)) END AS AvailableQty,
             ISNULL(pd.PItemQty, 0) as PItemQty,ISNULL(pd.PItemReturnQty, 0) as PItemReturnQty, 
             ISNULL(pd.DamageQty, 0) DamageQty,pd.unit AS UnitName,ISNULL(pd.StoredId, '') StoredId, 
             pd.UnitCode,pd.MainUnit,pd.MainUnitConverstion,Pd.Branch_Code,
@@ -3621,8 +3624,10 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             WHERE i.ItemCode = @ItemCode AND i.Branch_Code = @BranchCode AND pd.StoredId = @StoreId
             UNION ALL
             SELECT 0 AS PNo, 0 AS PONo,i.ItemCode,i.ItemName,ISNULL(os.OpeningRate, 0) AS ItemRate,
-            CASE WHEN ISNULL(IndentApprovalQty, 0) > 0 THEN ISNULL(OpeningQty, 0) - ISNULL(IndentApprovalQty, 0)
-            ELSE ISNULL(OpeningQty, 0) - ISNULL(IndentOrderQty, 0) END AS AvailableQty,
+            CASE WHEN ISNULL(IndentApprovalQty, 0) > 0 
+            THEN ISNULL(OpeningQty, 0) - ISNULL(IndentApprovalQty, 0) + ISNULL(IssuedReturnQty, 0) 
+            ELSE ISNULL(OpeningQty, 0) - ISNULL(IndentOrderQty, 0) + ISNULL(IssuedReturnQty, 0) 
+            END AS AvailableQty,
             ISNULL(os.OpeningQty, 0) AS PItemQty,
             0 AS PItemReturnQty,0 AS DamageQty, os.UnitName,os.StoreId AS StoredId,os.UnitCode,
             os.BaseUnitName AS MainUnit,os.BaseUnitCode AS MainUnitConverstion,os.Branch_Code,
@@ -4918,8 +4923,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         public async Task<List<IndentOrderSearchResponse>> SearchIndentOrderAsync(string branchCode)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
-            const string sql = @"SELECT IONo FROM IndentOrderApprovalMaster
-             WHERE Branch_Code = @BranchCode ORDER BY IONo DESC";
+            const string sql = @"SELECT  IONo FROM IndentOrderApprovalMaster 
+            WHERE Branch_Code = @BranchCode AND ISNULL(ItemIssueStatus, '') != 'issue'
+            ORDER BY IONo DESC";
 
             var result = await connection.QueryAsync<IndentOrderSearchResponse>(
                 sql,
@@ -5055,7 +5061,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     INo,
                     ItemCode,
                     IItemQty,
-                    IssuedQty,
+                    ItemIssuedQty,
                     IItemRate,
                     unit,
                     UnitCode,
@@ -5075,14 +5081,15 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     StockSource,
                     TrasnsactionNo,
                     OrginalQty,
-                    IndentNo
+                    IndentNo,
+                    IType
                 )
                 VALUES
                 (
                     @INo,
                     @ItemCode,
                     @IItemQty,
-                    @IssuedQty,
+                    @ItemIssuedQty,
                     @IItemRate,
                     @Unit,
                     @UnitCode,
@@ -5102,7 +5109,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     @StockSource,
                     @TrasnsactionNo,
                     @OrginalQty,
-                    @IndentNo
+                    @IndentNo,
+                    @IType
                 )";
 
                 foreach (var item in request.Items)
@@ -5114,7 +5122,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             INo = request.INo,
                             ItemCode = item.ItemCode,
                             IItemQty = Math.Round(item.IssueQty, 2),
-                            IssuedQty = Math.Round(item.IssueQty, 2),
+                            ItemIssuedQty = Math.Round(item.IssueQty, 2),
                             IItemRate = Math.Round(item.ItemRate, 2),
                             Unit = item.Unit,
                             UnitCode = item.UnitCode,
@@ -5134,7 +5142,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             StockSource = item.StockSource,
                             TrasnsactionNo=request.TrasnsactionNo,
                             OrginalQty= item.OrginalQty,
-                            IndentNo= request.IndentNo
+                            IndentNo= request.IndentNo,
+                            IType=request.IssueType
                         },
                         transaction);
 
@@ -5179,21 +5188,23 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
 
                     if (item.IssueQty > 0)
                     {
-                        const string getOpenStock = @"UPDATE IndentOrderApprovalDetail
-                            SET IssuedQty =ISNULL(IssuedQty, 0) + @IssuedQty
-                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
-                            AND Storeid = @StoreId and PNo=@PNo and IONo=@IONo";
+                        const string updateIssuedQtySql = @"
+                        UPDATE IndentOrderApprovalDetail
+                        SET IssuedQty = ISNULL(IssuedQty, 0) + @IssueQty
+                        WHERE ItemCode = @ItemCode AND Branch_Code = @BranchCode
+                        AND Storeid = @StoreId AND PNo = @PNo
+                        AND IONo = @IONo;";
 
-                        var openstock = await connection.QuerySingleOrDefaultAsync<dynamic>(
-                            getOpenStock,
+                        await connection.ExecuteAsync(
+                            updateIssuedQtySql,
                             new
                             {
                                 ItemCode = item.ItemCode,
-                                Branch_Code = request.Branch_Code,
-                                IssuedQty = item.IssueQty,
-                                Storeid = request.StoreId,
+                                BranchCode = request.Branch_Code,
+                                StoreId = request.StoreId,
                                 PNo = item.PNo,
-                                IONo = item.INo,
+                                IONo = request.IndentNo,
+                                IssueQty = item.IssueQty
                             },
                             transaction
                         );
@@ -5237,13 +5248,13 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 }
 
                 const string indentStatusSql = @"UPDATE IndentOrderApprovalMaster
-                SET Status = @Status WHERE IONo = @IONo AND Branch_Code = @BranchCode";
+                SET ItemIssueStatus = @Status WHERE IONo = @IONo AND Branch_Code = @BranchCode";
 
                 await connection.ExecuteAsync(
                     indentStatusSql,
                     new
                     {
-                        Status=request.Status,
+                        Status="issue",
                         IONo = request.IndentNo,
                         BranchCode = request.Branch_Code
                     },
@@ -5288,7 +5299,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(I.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             ISNULL(D.UnitCode, 0) AS UnitCode,
-            ISNULL(D.IssuedQty, 0) AS IssueQty,
+            ISNULL(D.IItemQty, 0) AS IssueQty,
             ISNULL(D.IItemRate, 0) AS ItemRate,
             ISNULL(D.PerRate, 0) AS PerRate,
             ISNULL(D.PNo, 0) AS PNo,
@@ -5303,7 +5314,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             ISNULL(D.AvailableQty, 0) AS AvailableQty,
             ISNULL(D.OrginalQty, 0) AS OrginalQty,
             ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
-            ISNULL(D.StockSource, '') AS StockSource
+            ISNULL(D.StockSource, '') AS StockSource,
+            ISNULL(D.IType, '') AS IssueType
         FROM ItemIssueDetail D
         LEFT JOIN InventoryItemMaster I
             ON D.ItemCode = I.ItemCode
@@ -5341,80 +5353,68 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
         #endregion
 
         #region Item Issue Return
-        public async Task<List<ItemIssueListDto>> GetItemIssueData(string branchCode)
+        public async Task<List<ItemIssueReturnNumber>> GetItemIssueNumber(string branchCode)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+            const string sql = @"SELECT distinct INo as IssueNo FROM ItemIssueMaster 
+            WHERE Branch_Code = @BranchCode and ISNULL(ItemReturnStatus,'') !='return' 
+            ORDER BY INo DESC";
+            var result = await connection.QueryAsync<ItemIssueReturnNumber>(
+                sql,
+                new
+                {
+                    BranchCode = branchCode,
+                });
+            return result.ToList();
+        }
+
+        public async Task<List<ItemIssueListDto>> GetItemIssueData(string branchCode,int ItemNo)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
 
-            const string query = @"SELECT
-            M.INo,
-            M.IDate,
-            ISNULL(M.DepCode, '') AS DepCode,
-            ISNULL(M.ITotalAmount, 0) AS TotalAmount,
-            ISNULL(M.Billno, '') AS BillNo,
-            ISNULL(M.Branch_Code, '') AS Branch_Code,
-            ISNULL(M.DIssue, 0) AS DIssue,
-            ISNULL(M.UserCode, '') AS UserCode,
-            ISNULL(M.PNO, 0) AS PNO,
-            ISNULL(M.IType, '') AS IssueType,
-            ISNULL(M.StoredId, '') AS StoreId,
-            ISNULL(M.Status, '') AS Status,
-            ISNULL(M.TrasnsactionNo, '') AS TrasnsactionNo
-        FROM ItemIssueMaster M
-        WHERE M.Branch_Code = @BranchCode
-        ORDER BY M.INo DESC;
+            const string query = @"SELECT M.INo,M.IDate,ISNULL(M.DepCode, '') AS DepCode,
+            ISNULL(M.ITotalAmount, 0) AS TotalAmount,ISNULL(M.Billno, '') AS BillNo,
+            ISNULL(M.Branch_Code, '') AS Branch_Code,ISNULL(M.DIssue, 0) AS DIssue,
+            ISNULL(M.UserCode, '') AS UserCode,ISNULL(M.PNO, 0) AS PNO,
+            ISNULL(M.IType, '') AS IssueType,ISNULL(M.StoredId, '') AS StoreId,
+            ISNULL(M.Status, '') AS Status,ISNULL(M.TrasnsactionNo, '') AS TrasnsactionNo,
+            ISNULL(M.IndentNo, 0) AS IndentNo
+            FROM ItemIssueMaster M WHERE M.Branch_Code = @BranchCode 
+            and M.IType='Issue' AND M.INo = @INo ORDER BY M.INo DESC;
 
-        SELECT
-            D.INo,
-            D.ItemCode,
-            ISNULL(I.ItemName, '') AS ItemName,
-            ISNULL(D.Unit, '') AS Unit,
-            ISNULL(D.UnitCode, 0) AS UnitCode,
-            ISNULL(D.IssuedQty, 0) AS IssueQty,
-            ISNULL(D.IItemRate, 0) AS ItemRate,
-            ISNULL(D.PerRate, 0) AS PerRate,
-            ISNULL(D.PNo, 0) AS PNo,
-            ISNULL(D.Branch_Code, '') AS Branch_Code,
-            ISNULL(D.QtyPer, 0) AS QtyPer,
-            ISNULL(D.NoOfQty, 0) AS NoOfQty,
-            ISNULL(D.StoreId, '') AS StoreId,
-            ISNULL(D.DepCode, 0) AS DepCode,
-            ISNULL(D.MainUnit, '') AS MainUnit,
+            SELECT D.INo,D.ItemCode,ISNULL(I.ItemName, '') AS ItemName,
+            ISNULL(D.Unit, '') AS Unit,ISNULL(D.UnitCode, 0) AS UnitCode,
+            ISNULL(D.IItemQty, 0) AS IssueQty,ISNULL(D.IItemRate, 0) AS ItemRate,
+            ISNULL(D.PerRate, 0) AS PerRate,ISNULL(D.PNo, 0) AS PNo,
+            ISNULL(D.Branch_Code, '') AS Branch_Code,ISNULL(D.QtyPer, 0) AS QtyPer,
+            ISNULL(D.NoOfQty, 0) AS NoOfQty,ISNULL(D.StoreId, '') AS StoreId,
+            ISNULL(D.DepCode, 0) AS DepCode,ISNULL(D.MainUnit, '') AS MainUnit,
             ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
-            ISNULL(D.ReturnQty, 0) AS ReturnQty,
-            ISNULL(D.AvailableQty, 0) AS AvailableQty,
-            ISNULL(D.OrginalQty, 0) AS OrginalQty,
-            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
-            ISNULL(D.StockSource, '') AS StockSource
-        FROM ItemIssueDetail D
-        LEFT JOIN InventoryItemMaster I
-            ON D.ItemCode = I.ItemCode
-           AND D.Branch_Code = I.Branch_Code
-        WHERE D.Branch_Code = @BranchCode
-        ORDER BY D.ItemCode;";
+            ISNULL(D.ReturnQty, 0) AS ReturnQty,ISNULL(D.AvailableQty, 0) AS AvailableQty,
+            ISNULL(D.OrginalQty, 0) AS OrginalQty,ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
+            ISNULL(D.StockSource, '') AS StockSource,ISNULL(D.IType, '') AS IssueType,
+            ISNULL(D.IndentNo, 0) AS IndentNo
+            FROM ItemIssueDetail D 
+            LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode 
+            AND D.Branch_Code = I.Branch_Code
+            WHERE D.Branch_Code = @BranchCode and D.IType='Issue' 
+            AND D.INo = @INo AND ISNULL(D.ItemIssuedQty, 0) > 0
+            ORDER BY D.ItemCode;";
 
             using var multi = await connection.QueryMultipleAsync(
                 query,
                 new
                 {
-                    BranchCode = branchCode
+                    BranchCode = branchCode,
+                    INo = ItemNo
                 });
-
             var masters = (await multi.ReadAsync<ItemIssueList>()).ToList();
-
             var items = (await multi.ReadAsync<ItemIssueDetailRequest>()).ToList();
-
             var result = masters.Select(master => new ItemIssueListDto
             {
                 Master = master,
-
-                Items = items
-                    .Where(x =>
-                        x.INo == master.INo &&
-                        x.Branch_Code == master.Branch_Code)
-                    .ToList()
-
+                Items = items.Where(x =>x.INo == master.INo && x.Branch_Code == master.Branch_Code).ToList()
             }).ToList();
-
             return result;
         }
 
@@ -5442,6 +5442,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 INSERT INTO ItemIssueReturnMaster
                 (
                     IRNo,
+                    INo,
                     IRDate,
                     DepCode,
                     IRTotalAmount,
@@ -5454,6 +5455,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                 VALUES
                 (
                     @IRNo,
+                    @INo,
                     @IRDate,
                     @DepCode,
                     @IRTotalAmount,
@@ -5469,6 +5471,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     new
                     {
                         request.IRNo,
+                        request.INo,
                         IRDate = request.IRDate,
                         DepCode = request.DeptCode,
                         request.IRTotalAmount,
@@ -5480,25 +5483,8 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     },
                     transaction);
 
-
                 foreach (var item in request.Items)
                 {
-                    const string issueQtySql = @"SELECT isnull(IItemQty, 0) as  IItemQty FROM ItemIssueDetail
-                    WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @BranchCode";
-
-                    decimal? balanceQty = await connection.ExecuteScalarAsync<decimal?>(
-                        issueQtySql,
-                        new
-                        {
-                            item.INo,
-                            item.ItemCode,
-                            item.PNo,
-                            request.BranchCode
-                        },
-                        transaction);
-
-                    decimal OriginalQty = balanceQty ?? 0m;
-
                     const string detailSql = @"
                     INSERT INTO ItemIssueReturnDetail
                     (
@@ -5516,9 +5502,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         DeptCode,
                         OriginalQty,
                         UnitCode,
-                        Unit,
+                        UnitName,
                         MainUnit,
-                        MainUnitConverstion
+                        MainUnitConverstion,
                         StockReferenceNo,
                         StockSource,
                         IndentNo
@@ -5539,15 +5525,13 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         @DeptCode,
                         @OriginalQty,
                         @UnitCode,
-                        @Unit,
+                        @UnitName,
                         @MainUnit,
                         @MainUnitConverstion,
                         @StockReferenceNo,
                         @StockSource,
                         @IndentNo
-
                     )";
-
                     await connection.ExecuteAsync(
                         detailSql,
                         new
@@ -5564,9 +5548,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             ReturnQty = item.ReturnQty,
                             AvailableQty = item.AvailableQty,
                             DeptCode = request.DeptCode,
-                            OriginalQty= OriginalQty,
+                            OriginalQty= item.OriginalQty,
                             UnitCode= item.UnitCode,
-                            Unit=item.Unit,
+                            UnitName=item.Unit,
                             MainUnit = item.MainUnit,
                             MainUnitConverstion = item.MainUnitConverstion,
                             StockReferenceNo = item.StockReferenceNo,
@@ -5577,11 +5561,11 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         transaction);
 
                     const string issueDetailSql = @" UPDATE ItemIssueDetail SET
-                    IItemReturnQty =ISNULL(IItemReturnQty, 0) + @IRItemQty,
-                    AvailableQty =ISNULL(AvailableQty, 0) + @AvailableQty,
-                    ReturnQty = ISNULL(ReturnQty, 0) + @ReturnQty
-                    WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo
-                    AND Branch_Code = @BranchCode";
+                         IItemReturnQty =ISNULL(IItemReturnQty, 0) + @IRItemQty,
+                         AvailableQty =ISNULL(AvailableQty, 0) + @AvailableQty,
+                         ReturnQty = ISNULL(ReturnQty, 0) + @ReturnQty
+                         WHERE INo = @INo AND ItemCode = @ItemCode AND PNo = @PNo
+                         AND Branch_Code = @BranchCode";
 
                     int issueUpdated = await connection.ExecuteAsync(
                         issueDetailSql,
@@ -5613,23 +5597,17 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                                 ReturnQty = item.ReturnQty,
                                 Storeid = request.StoredId,
                                 PNo = item.PNo,
-                                IONo = item.INo,
+                                IONo =item.IndentNo,
                             },
                             transaction
                         );
                     }
-
-                    if (issueUpdated == 0)
-                    {
-                        throw new Exception(
-                            $"ItemIssueDetail not found. Issue No: {item.INo}, Item: {item.ItemCode}");
-                    }
-                    if (item.StockSource.ToLower() == "purchase" && item.PNo > 0)
+                    if (item.StockSource.ToLower() == "purchasestock" && item.PNo > 0)
                     {
                         const string purchaseDetailSql = @"UPDATE PurchaseDetail SET 
-                        IssuedReturnQty =ISNULL(IssuedReturnQty, 0) - @ReturnQty
-                        WHERE ItemCode = @ItemCode AND PNO = @PNo
-                        AND Branch_Code = @BranchCode";
+                            IssuedReturnQty =ISNULL(IssuedReturnQty, 0) + @ReturnQty
+                            WHERE ItemCode = @ItemCode AND PNO = @PNo
+                            AND Branch_Code = @BranchCode";
 
                         await connection.ExecuteAsync(
                             purchaseDetailSql,
@@ -5645,9 +5623,9 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                     else if (item.PNo == 0)
                     {
                         const string getPOItemQtyQuery = @"UPDATE Tbl_ItemOpeningStock
-                        SET IssuedReturnQty =ISNULL(IssuedReturnQty, 0) + @IssuedReturnQty
-                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
-                        AND Storeid = @StoreId";
+                            SET IssuedReturnQty =ISNULL(IssuedReturnQty, 0) + @IssuedReturnQty
+                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code
+                            AND Storeid = @StoreId";
 
                         var poItem = await connection.QuerySingleOrDefaultAsync<dynamic>(
                             getPOItemQtyQuery,
@@ -5662,6 +5640,18 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         );
                     }
                 }
+                const string indentStatusSql = @"UPDATE ItemIssueMaster
+                SET ItemReturnStatus = @Status WHERE INo = @INo AND Branch_Code = @BranchCode";
+
+                await connection.ExecuteAsync(
+                    indentStatusSql,
+                    new
+                    {
+                        Status = "return",
+                        INo = request.INo,
+                        BranchCode = request.BranchCode
+                    },
+                    transaction);
                 transaction.Commit();
                 return request.IRNo;
             }
@@ -5672,80 +5662,49 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             }
         }
 
-        public async Task<List<ItemIssueListDto>> GetItemIssueReturnPrintData(string branchCode, int iNo)
+        public async Task<List<ItemIssueReturnListDto>> GetItemIssueReturnPrintData(string branchCode, int IRNo)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
 
-            const string query = @"SELECT
-            M.INo,
-            M.IDate,
-            ISNULL(M.DepCode, '') AS DepCode,
-            ISNULL(M.ITotalAmount, 0) AS ITotalAmount,
-            ISNULL(M.Billno, '') AS BillNo,
-            ISNULL(M.Branch_Code, '') AS BranchCode,
-            ISNULL(M.DIssue, 0) AS DIssue,
-            ISNULL(M.UserCode, '') AS UserCode,
-            ISNULL(M.PNO, 0) AS PNO,
-            ISNULL(M.IType, '') AS IssueType,
-            ISNULL(M.StoreId, '') AS StoreId,
-            ISNULL(M.Status, '') AS Status
-        FROM ItemIssueReturnMaster M
-        WHERE M.Branch_Code = @BranchCode
-          AND M.INo = @INo
-        ORDER BY M.INo DESC;
+            const string query = @"SELECT M.IRNo,M.INo,ISNULL(M.Status, '') AS Status,
+            M.IRDate,ISNULL(M.DepCode, '') AS DepCode,ISNULL(M.IRTotalAmount, 0) AS IRTotalAmount,
+            ISNULL(M.Billno, '') AS BillNo,ISNULL(M.Branch_Code, '') AS Branch_Code,
+            ISNULL(M.DIssue, 0) AS DIssue,ISNULL(M.PNO, 0) AS PNO,
+            ISNULL(M.IType, '') AS IssueType,ISNULL(M.StoredId, '') AS StoreId
+            FROM ItemIssueReturnMaster M
+            WHERE M.Branch_Code = @BranchCode AND M.INo = @INo
+            ORDER BY M.INo DESC;
 
-        SELECT
-            D.INo,
-            D.ItemCode,
-            ISNULL(D.Unit, '') AS Unit,
-            ISNULL(D.UnitCode, 0) AS UnitCode,
-            ISNULL(D.IItemQty, 0) AS IssueQty,
-            ISNULL(D.IItemRate, 0) AS ItemRate,
-            ISNULL(D.PerRate, 0) AS PerRate,
-            ISNULL(D.PNo, 0) AS PNo,
-            ISNULL(D.Branch_Code, '') AS BranchCode,
-            ISNULL(D.QtyPer, 0) AS QtyPer,
-            ISNULL(D.NoOfQty, 0) AS NoOfQty,
-            ISNULL(D.StoreId, '') AS StoreId,
-            ISNULL(D.DepCode, '') AS DepCode,
-            ISNULL(I.ItemName, '') AS ItemName,
-            ISNULL(D.MainUnit, '') AS MainUnit,
+            SELECT D.INo,D.IRNo,D.ItemCode,D.IndentNo,ISNULL(D.Unit, '') AS Unit,
+            ISNULL(D.UnitCode, 0) AS UnitCode,ISNULL(D.IRItemQty, 0) AS IRItemQty,
+            ISNULL(D.IRItemRate, 0) AS IRItemRate,ISNULL(D.PerRate, 0) AS PerRate,
+            ISNULL(D.PNo, 0) AS PNo,ISNULL(D.Branch_Code, '') AS BranchCode,
+            ISNULL(D.QtyPer, 0) AS QtyPer,ISNULL(D.IRNoOfQty, 0) AS IRNoOfQty,
+            ISNULL(D.StoredId, '') AS StoreId,ISNULL(D.DeptCode, '') AS DepCode,
+            ISNULL(I.ItemName, '') AS ItemName,ISNULL(D.MainUnit, '') AS MainUnit,
             ISNULL(D.MainUnitConverstion, '') AS MainUnitConverstion,
-            ISNULL(D.ReturnQty, 0) AS ReturnQty,
-            ISNULL(D.AvailableQty, 0) AS AvailableQty,
-            ISNULL(D.ReturnQty, 0) AS ReturnQty,
-            ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
+            ISNULL(D.ReturnQty, 0) AS ReturnQty,ISNULL(D.AvailableQty, 0) AS AvailableQty,
+            ISNULL(D.OriginalQty, 0) AS OriginalQty,ISNULL(D.StockReferenceNo, 0) AS StockReferenceNo,
             ISNULL(D.StockSource, '') AS StockSource
-        FROM ItemIssueReturnDetail D
-        LEFT JOIN InventoryItemMaster I
-            ON D.ItemCode = I.ItemCode
-           AND D.Branch_Code = I.Branch_Code
-        WHERE D.Branch_Code = @BranchCode
-          AND D.INo = @INo
-        ORDER BY D.ItemCode;";
+            FROM ItemIssueReturnDetail D
+            LEFT JOIN InventoryItemMaster I ON D.ItemCode = I.ItemCode AND D.Branch_Code = I.Branch_Code
+            WHERE D.Branch_Code = @BranchCode AND D.IRNo = @IRNo
+            ORDER BY D.ItemCode;";
 
             using var multi = await connection.QueryMultipleAsync(
                 query,
                 new
                 {
                     BranchCode = branchCode,
-                    INo = iNo
+                    IRNo = IRNo
                 });
 
-            var masters = (await multi.ReadAsync<ItemIssueList>()).ToList();
-
-            var items = (await multi.ReadAsync<ItemIssueDetailRequest>()).ToList();
-
-            var result = masters.Select(master => new ItemIssueListDto
+            var masters = (await multi.ReadAsync<ItemIssueReturnSave>()).ToList();
+            var items = (await multi.ReadAsync<ItemIssueReturnDetailRequest>()).ToList();
+            var result = masters.Select(master => new ItemIssueReturnListDto
             {
                 Master = master,
-
-                Items = items
-                    .Where(x =>
-                        x.INo == master.INo &&
-                        x.Branch_Code == master.Branch_Code)
-                    .ToList()
-
+                Items = items.Where(x =>x.IRNo == master.IRNo &&x.Branch_Code == master.Branch_Code).ToList()
             }).ToList();
 
             return result;
@@ -5957,5 +5916,655 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             return rows > 0;
         }
         #endregion
+
+        public async Task<List<StockReportResponse>> GetStockReportAsync(StockReportRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (request.FromDate == default)
+                throw new Exception("From date is required.");
+
+            if (request.ToDate == default)
+                throw new Exception("To date is required.");
+
+            if (request.FromDate.Date > request.ToDate.Date)
+                throw new Exception("From date cannot be greater than To date.");
+
+            if (string.IsNullOrWhiteSpace(request.BranchCode))
+                throw new Exception("Branch code is required.");
+
+            if (request.StoreId <= 0)
+                throw new Exception("Store is required.");
+
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            /*
+             * ============================================================
+             * 1. GET ITEMS
+             * ============================================================
+             *
+             * We get items which have stock/activity in the selected
+             * branch and store.
+             */
+
+            const string itemSql = @"
+        SELECT DISTINCT
+            I.ItemCode,
+            I.ItemName,
+            ISNULL(I.UnitName, '') AS UnitName
+        FROM InventoryItemMaster I
+        WHERE I.Branch_Code = @BranchCode
+          AND
+          (
+                @ItemCode IS NULL
+                OR I.ItemCode = @ItemCode
+          )
+          AND
+          (
+                EXISTS
+                (
+                    SELECT 1
+                    FROM Tbl_ItemOpeningStock OS
+                    WHERE OS.ItemCode = I.ItemCode
+                      AND OS.StoreId = @StoreId
+                      AND OS.Branch_Code = @BranchCode
+                      AND OS.IsActive = 1
+                )
+
+                OR
+
+                EXISTS
+                (
+                    SELECT 1
+                    FROM PurchaseDetail PD
+                    INNER JOIN PurchaseMaster PM
+                        ON PM.PNo = PD.PNo
+                       AND PM.Branch_Code = PD.Branch_Code
+                    WHERE PD.ItemCode = I.ItemCode
+                      AND PD.StoredId = @StoreId
+                      AND PD.Branch_Code = @BranchCode
+                )
+
+                OR
+
+                EXISTS
+                (
+                    SELECT 1
+                    FROM ItemIssueDetail IID
+                    WHERE IID.ItemCode = I.ItemCode
+                      AND IID.StoreId = @StoreId
+                      AND IID.Branch_Code = @BranchCode
+                )
+          )
+        ORDER BY I.ItemCode;
+    ";
+
+            var items = (await connection.QueryAsync<dynamic>(
+                itemSql,
+                new
+                {
+                    request.BranchCode,
+                    request.StoreId,
+                    request.ItemCode
+                })).ToList();
+
+            var result = new List<StockReportResponse>();
+
+
+            /*
+             * ============================================================
+             * 2. PROCESS EACH ITEM
+             * ============================================================
+             */
+
+            foreach (var item in items)
+            {
+                int itemCode = Convert.ToInt32(item.ItemCode);
+
+                string itemName =
+                    Convert.ToString(item.ItemName) ?? string.Empty;
+
+                string unitName =
+                    Convert.ToString(item.UnitName) ?? string.Empty;
+
+
+                /*
+                 * ========================================================
+                 * 3. FIND FIRST OPENING STOCK
+                 * ========================================================
+                 *
+                 * This is the starting physical stock.
+                 */
+
+                const string firstOpeningSql = @"
+            SELECT TOP 1
+                OS.StockDate,
+                ISNULL(OS.OpeningQty, 0) AS OpeningQty,
+                ISNULL(OS.UnitName, '') AS UnitName
+            FROM Tbl_ItemOpeningStock OS
+            WHERE OS.ItemCode = @ItemCode
+              AND OS.StoreId = @StoreId
+              AND OS.Branch_Code = @BranchCode
+              AND OS.IsActive = 1
+              AND CAST(OS.StockDate AS DATE) <= @FromDate
+            ORDER BY
+                CAST(OS.StockDate AS DATE) DESC,
+                OS.OpeningStockId DESC;
+        ";
+
+                var openingStock =
+                    await connection.QueryFirstOrDefaultAsync<dynamic>(
+                        firstOpeningSql,
+                        new
+                        {
+                            ItemCode = itemCode,
+                            request.StoreId,
+                            request.BranchCode,
+                            FromDate = request.FromDate.Date
+                        });
+
+
+                decimal currentOpeningQty = 0m;
+
+                DateTime? openingStockDate = null;
+
+
+                if (openingStock != null)
+                {
+                    currentOpeningQty =
+                        Convert.ToDecimal(openingStock.OpeningQty);
+
+                    openingStockDate =
+                        Convert.ToDateTime(openingStock.StockDate);
+
+                    string openingUnit =
+                        Convert.ToString(openingStock.UnitName)
+                        ?? string.Empty;
+
+                    if (!string.IsNullOrWhiteSpace(openingUnit))
+                    {
+                        unitName = openingUnit;
+                    }
+                }
+
+
+                /*
+                 * ========================================================
+                 * 4. IF OPENING STOCK IS BEFORE FROM DATE
+                 * ========================================================
+                 *
+                 * Example:
+                 *
+                 * Opening stock = 20 on 20-Sep
+                 *
+                 * Report starts = 24-Sep
+                 *
+                 * We must calculate:
+                 *
+                 * 20-Sep Opening
+                 * + purchases
+                 * - returns
+                 * - damage
+                 * - issues
+                 * + issue returns
+                 *
+                 * until 23-Sep.
+                 *
+                 * Therefore 24-Sep opening becomes the actual balance.
+                 */
+
+                if (openingStockDate.HasValue &&
+                    openingStockDate.Value.Date < request.FromDate.Date)
+                {
+                    const string previousPurchaseSql = @"
+                SELECT
+                    ISNULL(
+                        SUM(ISNULL(PD.PItemQty, 0)),
+                        0
+                    ) AS PurchaseQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.PItemReturnQty, 0)),
+                        0
+                    ) AS PurchaseReturnQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.DamageQty, 0)),
+                        0
+                    ) AS DamageQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.IssuedQty, 0)),
+                        0
+                    ) AS IssuedQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.IssuedReturnQty, 0)),
+                        0
+                    ) AS IssuedReturnQty
+
+                FROM PurchaseDetail PD
+
+                INNER JOIN PurchaseMaster PM
+                    ON PM.PNo = PD.PNo
+                   AND PM.Branch_Code = PD.Branch_Code
+
+                WHERE PD.ItemCode = @ItemCode
+                  AND PD.StoredId = @StoreId
+                  AND PD.Branch_Code = @BranchCode
+
+                  AND CAST(PM.PDate AS DATE)
+                        > @OpeningDate
+
+                  AND CAST(PM.PDate AS DATE)
+                        < @FromDate;";
+
+                    var previousPurchase =
+                        await connection.QueryFirstAsync<dynamic>(
+                            previousPurchaseSql,
+                            new
+                            {
+                                ItemCode = itemCode,
+                                request.StoreId,
+                                request.BranchCode,
+                                OpeningDate = openingStockDate.Value.Date,
+                                FromDate = request.FromDate.Date
+                            });
+
+
+                    /*
+                     * Purchase stock
+                     */
+
+                    currentOpeningQty +=
+                        Convert.ToDecimal(previousPurchase.PurchaseQty);
+
+                    currentOpeningQty -=
+                        Convert.ToDecimal(previousPurchase.PurchaseReturnQty);
+
+                    currentOpeningQty -=
+                        Convert.ToDecimal(previousPurchase.DamageQty);
+
+                    currentOpeningQty -=
+                        Convert.ToDecimal(previousPurchase.IssuedQty);
+
+                    currentOpeningQty +=
+                        Convert.ToDecimal(previousPurchase.IssuedReturnQty);
+
+                    const string previousOpeningSql = @"
+                SELECT
+                    ISNULL(
+                        SUM(ISNULL(OS.IssuedQty, 0)),
+                        0
+                    ) AS IssuedQty,
+
+                    ISNULL(
+                        SUM(ISNULL(OS.IssuedReturnQty, 0)),
+                        0
+                    ) AS IssuedReturnQty
+
+                FROM Tbl_ItemOpeningStock OS
+
+                WHERE OS.ItemCode = @ItemCode
+                  AND OS.StoreId = @StoreId
+                  AND OS.Branch_Code = @BranchCode
+                  AND OS.IsActive = 1
+
+                  AND CAST(OS.StockDate AS DATE)
+                        > @OpeningDate
+
+                  AND CAST(OS.StockDate AS DATE)
+                        < @FromDate;";
+
+                    var previousOpening =
+                        await connection.QueryFirstAsync<dynamic>(
+                            previousOpeningSql,
+                            new
+                            {
+                                ItemCode = itemCode,
+                                request.StoreId,
+                                request.BranchCode,
+                                OpeningDate = openingStockDate.Value.Date,
+                                FromDate = request.FromDate.Date
+                            });
+
+
+                    currentOpeningQty -=
+                        Convert.ToDecimal(previousOpening.IssuedQty);
+
+                    currentOpeningQty +=
+                        Convert.ToDecimal(previousOpening.IssuedReturnQty);
+                }
+
+
+                /*
+                 * ========================================================
+                 * 5. PROCESS EVERY DAY
+                 * ========================================================
+                 */
+
+                DateTime currentDate =
+                    request.FromDate.Date;
+
+
+                while (currentDate <= request.ToDate.Date)
+                {
+                    /*
+                     * ====================================================
+                     * 5A. EXPLICIT OPENING STOCK FOR THIS DATE
+                     * ====================================================
+                     *
+                     * If the user has created an opening-stock record
+                     * specifically for this date, use it.
+                     *
+                     * Otherwise:
+                     *
+                     *     Opening = Previous day's Closing
+                     */
+
+                    const string dailyOpeningSql = @"
+                SELECT TOP 1
+                    ISNULL(OS.OpeningQty, 0) AS OpeningQty,
+                    ISNULL(OS.UnitName, '') AS UnitName
+                FROM Tbl_ItemOpeningStock OS
+                WHERE OS.ItemCode = @ItemCode
+                  AND OS.StoreId = @StoreId
+                  AND OS.Branch_Code = @BranchCode
+                  AND OS.IsActive = 1
+                  AND CAST(OS.StockDate AS DATE) = @StockDate
+                ORDER BY OS.OpeningStockId DESC;
+            ";
+
+                    var dailyOpening =
+                        await connection.QueryFirstOrDefaultAsync<dynamic>(
+                            dailyOpeningSql,
+                            new
+                            {
+                                ItemCode = itemCode,
+                                request.StoreId,
+                                request.BranchCode,
+                                StockDate = currentDate
+                            });
+
+
+                    if (dailyOpening != null)
+                    {
+                        currentOpeningQty =
+                            Convert.ToDecimal(dailyOpening.OpeningQty);
+
+                        string dailyUnit =
+                            Convert.ToString(dailyOpening.UnitName)
+                            ?? string.Empty;
+
+                        if (!string.IsNullOrWhiteSpace(dailyUnit))
+                        {
+                            unitName = dailyUnit;
+                        }
+                    }
+
+
+                    /*
+                     * ====================================================
+                     * 5B. PURCHASE STOCK
+                     * ====================================================
+                     *
+                     * PurchaseDetail:
+                     *
+                     * PItemQty
+                     * PItemReturnQty
+                     * DamageQty
+                     * IssuedQty
+                     * IssuedReturnQty
+                     */
+
+                    const string purchaseSql = @"
+                SELECT
+                    ISNULL(
+                        SUM(ISNULL(PD.PItemQty, 0)),
+                        0
+                    ) AS PurchaseQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.PItemReturnQty, 0)),
+                        0
+                    ) AS PurchaseReturnQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.DamageQty, 0)),
+                        0
+                    ) AS DamageQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.IssuedQty, 0)),
+                        0
+                    ) AS IssuedQty,
+
+                    ISNULL(
+                        SUM(ISNULL(PD.IssuedReturnQty, 0)),
+                        0
+                    ) AS IssuedReturnQty
+
+                FROM PurchaseDetail PD
+
+                INNER JOIN PurchaseMaster PM
+                    ON PM.PNo = PD.PNo
+                   AND PM.Branch_Code = PD.Branch_Code
+
+                WHERE PD.ItemCode = @ItemCode
+                  AND PD.StoredId = @StoreId
+                  AND PD.Branch_Code = @BranchCode
+
+                  AND CAST(PM.PDate AS DATE)
+                        = @StockDate;
+            ";
+
+                    var purchase =
+                        await connection.QueryFirstAsync<dynamic>(
+                            purchaseSql,
+                            new
+                            {
+                                ItemCode = itemCode,
+                                request.StoreId,
+                                request.BranchCode,
+                                StockDate = currentDate
+                            });
+
+
+                    decimal purchaseQty =
+                        Convert.ToDecimal(purchase.PurchaseQty);
+
+                    decimal purchaseReturnQty =
+                        Convert.ToDecimal(purchase.PurchaseReturnQty);
+
+                    decimal damageQty =
+                        Convert.ToDecimal(purchase.DamageQty);
+
+                    decimal purchaseIssuedQty =
+                        Convert.ToDecimal(purchase.IssuedQty);
+
+                    decimal purchaseIssuedReturnQty =
+                        Convert.ToDecimal(
+                            purchase.IssuedReturnQty);
+
+
+                    /*
+                     * ====================================================
+                     * 5C. OPENING STOCK TRANSACTIONS
+                     * ====================================================
+                     *
+                     * Opening stock can also have:
+                     *
+                     * IssuedQty
+                     * IssuedReturnQty
+                     */
+
+                    const string openingTransactionSql = @"
+                SELECT
+                    ISNULL(
+                        SUM(ISNULL(OS.IssuedQty, 0)),
+                        0
+                    ) AS IssuedQty,
+
+                    ISNULL(
+                        SUM(ISNULL(OS.IssuedReturnQty, 0)),
+                        0
+                    ) AS IssuedReturnQty
+
+                FROM Tbl_ItemOpeningStock OS
+
+                WHERE OS.ItemCode = @ItemCode
+                  AND OS.StoreId = @StoreId
+                  AND OS.Branch_Code = @BranchCode
+                  AND OS.IsActive = 1
+
+                  AND CAST(OS.StockDate AS DATE)
+                        = @StockDate;
+            ";
+
+                    var openingTransaction =
+                        await connection.QueryFirstAsync<dynamic>(
+                            openingTransactionSql,
+                            new
+                            {
+                                ItemCode = itemCode,
+                                request.StoreId,
+                                request.BranchCode,
+                                StockDate = currentDate
+                            });
+
+
+                    decimal openingIssuedQty =
+                        Convert.ToDecimal(
+                            openingTransaction.IssuedQty);
+
+                    decimal openingIssuedReturnQty =
+                        Convert.ToDecimal(
+                            openingTransaction.IssuedReturnQty);
+
+
+                    /*
+                     * ====================================================
+                     * 5D. TOTAL ISSUE
+                     * ====================================================
+                     *
+                     * Purchase stock issue
+                     * +
+                     * Opening stock issue
+                     */
+
+                    decimal totalIssuedQty =
+                        purchaseIssuedQty
+                        + openingIssuedQty;
+
+
+                    /*
+                     * ====================================================
+                     * 5E. TOTAL ISSUE RETURN
+                     * ====================================================
+                     */
+
+                    decimal totalIssuedReturnQty =
+                        purchaseIssuedReturnQty
+                        + openingIssuedReturnQty;
+
+
+                    /*
+                     * ====================================================
+                     * 5F. FINAL CLOSING
+                     * ====================================================
+                     */
+
+                    decimal closingQty =
+                        currentOpeningQty
+                        + purchaseQty
+                        - purchaseReturnQty
+                        - damageQty
+                        - totalIssuedQty
+                        + totalIssuedReturnQty;
+
+
+                    /*
+                     * Don't allow negative report stock.
+                     */
+
+                    if (closingQty < 0)
+                    {
+                        closingQty = 0;
+                    }
+
+
+                    /*
+                     * ====================================================
+                     * 5G. ADD REPORT ROW
+                     * ====================================================
+                     */
+
+                    result.Add(
+                        new StockReportResponse
+                        {
+                            StockDate = currentDate,
+
+                            ItemCode = itemCode,
+
+                            ItemName = itemName,
+
+                            StoreId = request.StoreId,
+
+                            UnitName = unitName,
+
+                            OpeningQty =
+                                Math.Round(
+                                    currentOpeningQty,
+                                    4),
+
+                            PurchaseQty =
+                                Math.Round(
+                                    purchaseQty,
+                                    4),
+
+                            PurchaseReturnQty =
+                                Math.Round(
+                                    purchaseReturnQty,
+                                    4),
+
+                            DamageQty =
+                                Math.Round(
+                                    damageQty,
+                                    4),
+
+                            IssuedQty =
+                                Math.Round(
+                                    totalIssuedQty,
+                                    4),
+
+                            IssuedReturnQty =
+                                Math.Round(
+                                    totalIssuedReturnQty,
+                                    4),
+
+                            ClosingQty =
+                                Math.Round(
+                                    closingQty,
+                                    4)
+                        });
+
+
+                    /*
+                     * ====================================================
+                     * 5H. NEXT DAY OPENING
+                     * ====================================================
+                     */
+
+                    currentOpeningQty =
+                        closingQty;
+
+
+                    currentDate =
+                        currentDate.AddDays(1);
+                }
+            }
+            return result;
+        }
     }
 }

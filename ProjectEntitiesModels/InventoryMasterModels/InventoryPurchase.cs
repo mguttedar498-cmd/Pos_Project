@@ -25,7 +25,7 @@
         public decimal GrossAmount { get; set; } = 0;
         public int StoreId { get; set; } = 0;
         public string status { get; set; } = string.Empty;
-        public DateTime POValidDate { get; set; }= DateTime.Now;
+        public DateTime POValidDate { get; set; } = DateTime.Now;
         public DateTime Deliverydate { get; set; } = DateTime.Now;
         public decimal CgstAmount { get; set; } = 0;
         public decimal SgstAmount { get; set; } = 0;
@@ -41,14 +41,14 @@
         public string ItemName { get; set; } = string.Empty;
         public decimal POItemQty { get; set; } = 0;
         public decimal POOrderQty { get; set; } = 0;
-        public decimal POItemRate { get; set; }= 0;
+        public decimal POItemRate { get; set; } = 0;
         public string Branch_Code { get; set; } = string.Empty;
         public string Unit { get; set; } = string.Empty;
         public int UnitCode { get; set; } = 0;
         public decimal POItemSuplyQty { get; set; } = 0;
         public decimal CPOItemQty { get; set; } = 0;
-        public string? ApprovedBy { get; set; }= string.Empty;
-        public DateTime? ApprovedDate { get; set; }= DateTime.Now;
+        public string? ApprovedBy { get; set; } = string.Empty;
+        public DateTime? ApprovedDate { get; set; } = DateTime.Now;
         public int TaxCode { get; set; } = 0;
         public string TaxName { get; set; } = string.Empty;
         public decimal ReceivedQty { get; set; } = 0;
@@ -64,7 +64,7 @@
         public int ItemCode { get; set; } = 0;
         public int TaxCode { get; set; } = 0;
         public decimal TaxPer { get; set; } = 0;
-        public decimal TaxAmount { get; set; } = 0; 
+        public decimal TaxAmount { get; set; } = 0;
         public string Branch_Code { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
         public string TaxDescription { get; set; } = string.Empty;
@@ -161,8 +161,8 @@
         public string Branch { get; set; } = string.Empty;
         public double Discount { get; set; } = 0;
         public string DiscountIn { get; set; } = string.Empty;
-        public List<PODetailsModel> PODetail { get; set; }= new List<PODetailsModel>();
-        public List<POMiscModel> POMiscDetail { get; set; }= new List<POMiscModel>();
+        public List<PODetailsModel> PODetail { get; set; } = new List<PODetailsModel>();
+        public List<POMiscModel> POMiscDetail { get; set; } = new List<POMiscModel>();
     }
     public class POMiscModel
     {
@@ -230,7 +230,7 @@
         public string TaxCode { get; set; } = string.Empty;
         public string TaxName { get; set; } = string.Empty;
         public double Taxper { get; set; } = 0;
-        public double POTotalAmount{ get; set; } = 0;
+        public double POTotalAmount { get; set; } = 0;
         public double TaxAmount { get; set; } = 0;
         public double Total { get; set; } = 0;
         public double CGST { get; set; } = 0;
@@ -335,25 +335,25 @@
     }
     public class GRNMasterModel
     {
-        public string VendorName { get; set; }=string.Empty;
-        public string VendorAddress { get; set; }=string.Empty;
-        public string PhoneNo { get; set; }=string.Empty;
-        public string MobileNo { get; set; }=string.Empty;
-        public string GSTNo { get; set; }=string.Empty;
-        public string TinNo { get; set; }=string.Empty;
-        public string StateCode { get; set; }=string.Empty;
+        public string VendorName { get; set; } = string.Empty;
+        public string VendorAddress { get; set; } = string.Empty;
+        public string PhoneNo { get; set; } = string.Empty;
+        public string MobileNo { get; set; } = string.Empty;
+        public string GSTNo { get; set; } = string.Empty;
+        public string TinNo { get; set; } = string.Empty;
+        public string StateCode { get; set; } = string.Empty;
         public int PONo { get; set; } = 0;
-        public DateTime? PODate { get; set; }= DateTime.Now;
-        public string SupCode { get; set; }=string.Empty;
+        public DateTime? PODate { get; set; } = DateTime.Now;
+        public string SupCode { get; set; } = string.Empty;
         public DateTime? POValidDate { get; set; } = DateTime.Now;
-        public string Billed { get; set; }=string.Empty;
-        public string Branch_Code { get; set; }=string.Empty;
-        public string OrderBy { get; set; }=string.Empty;
-        public string status { get; set; }=string.Empty;
+        public string Billed { get; set; } = string.Empty;
+        public string Branch_Code { get; set; } = string.Empty;
+        public string OrderBy { get; set; } = string.Empty;
+        public string status { get; set; } = string.Empty;
         public string? GRNNo { get; set; } = string.Empty;
         public DateTime? GRNDate { get; set; }
-        public string GRNtime { get; set; }=string.Empty;
-        public string Receivedby { get; set; }=string.Empty; 
+        public string GRNtime { get; set; } = string.Empty;
+        public string Receivedby { get; set; } = string.Empty;
         public string Reason { get; set; } = string.Empty;
         public string InspectedBy { get; set; } = string.Empty;
         public int? StoreID { get; set; } = 0;
@@ -507,7 +507,7 @@
         public string TinNo { get; set; } = string.Empty;
         public string StateCode { get; set; } = string.Empty;
         public int PNo { get; set; } = 0;
-        public DateTime PDate { get; set; }=DateTime.Now;
+        public DateTime PDate { get; set; } = DateTime.Now;
         public int SupCode { get; set; } = 0;
         public decimal? PTotalAmount { get; set; } = 0;
         public string? BillNo { get; set; } = string.Empty;
@@ -641,7 +641,7 @@
         public decimal PRItemQty { get; set; }
         public decimal PRNIQty { get; set; }
         public decimal PReturnQty { get; set; }
-        public decimal PRAQty { get; set; } 
+        public decimal PRAQty { get; set; }
         public string Unit { get; set; } = string.Empty;
         public int UnitCode { get; set; } = 0;
         public string MainUnit { get; set; } = string.Empty;
@@ -776,7 +776,7 @@
         public decimal MissChargeAmount { get; set; } = 0;
         public decimal CgstAmount { get; set; } = 0;
         public decimal SgstAmount { get; set; } = 0;
-        public string BranchCode { get; set; }=string.Empty;
+        public string BranchCode { get; set; } = string.Empty;
         public List<ItemDamageDetailRequest> Details { get; set; } = new List<ItemDamageDetailRequest>();
     }
     public class PurchaseQuantityModel
@@ -808,7 +808,7 @@
         public string Branch_Code { get; set; } = string.Empty;
         public decimal DTotalAmount { get; set; }
         public int ItemCode { get; set; }
-        public string ItemName { get; set; }=string.Empty;
+        public string ItemName { get; set; } = string.Empty;
         public int PNo { get; set; }
         public decimal ItemQty { get; set; }
         public decimal DItemQty { get; set; }
@@ -860,7 +860,7 @@
         public int IONo { get; set; }
         public string Billed { get; set; } = string.Empty;
         public DateTime IODate { get; set; }
-        public DateTime POValidDate { get; set; }=DateTime.Now;
+        public DateTime POValidDate { get; set; } = DateTime.Now;
         public string StoreCode { get; set; } = string.Empty;
         public string OrderBy { get; set; } = string.Empty;
         public string DepCode { get; set; } = string.Empty;
@@ -1004,6 +1004,7 @@
     public class IndentOrderSearchResponse
     {
         public int IONo { get; set; }
+        public Decimal ReamingQty { get; set; } = 0;
     }
     public class ItemIssueSaveRequest
     {
@@ -1028,7 +1029,7 @@
     {
         public int INo { get; set; }
         public int ItemCode { get; set; }
-        public string ItemName { get; set; } = string.Empty;    
+        public string ItemName { get; set; } = string.Empty;
         public decimal IssueQty { get; set; }
         public decimal ItemRate { get; set; }
         public string Unit { get; set; } = string.Empty;
@@ -1046,8 +1047,8 @@
         public int DepCode { get; set; } = 0;
         public string StockSource { get; set; } = string.Empty;
         public int StockReferenceNo { get; set; } = 0;
-
-
+        public int IndentNo { get; set; } = 0;
+        public string IssueType { get; set; } = string.Empty;
     }
     public class ItemIssueList
     {
@@ -1076,19 +1077,20 @@
     #region Item Issue Return
     public class ItemIssueReturnSaveRequest
     {
+        public int INo { get; set; }
         public int IRNo { get; set; }
         public DateTime IRDate { get; set; }
         public string BranchCode { get; set; } = string.Empty;
-        public decimal IRTotalAmount { get; set; } =0;
+        public decimal IRTotalAmount { get; set; } = 0;
         public string StoredId { get; set; } = string.Empty;
         public string IType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string DeptCode { get; set; } = string.Empty;
         public List<ItemIssueReturnDetailRequest> Items { get; set; } = new();
     }
-
     public class ItemIssueReturnDetailRequest
     {
+        public int IRNo { get; set; }
         public int INo { get; set; }
         public int ItemCode { get; set; }
         public decimal IRItemRate { get; set; }
@@ -1096,6 +1098,7 @@
         public decimal IRNoofQty { get; set; }
         public decimal ReturnQty { get; set; }
         public decimal AvailableQty { get; set; }
+        public decimal OriginalQty { get; set; }
         public int PNo { get; set; } = 0;
         public int IndentNo { get; set; }
         public int UnitCode { get; set; } = 0;
@@ -1104,6 +1107,29 @@
         public string MainUnitConverstion { get; set; } = string.Empty;
         public string StockSource { get; set; } = string.Empty;
         public int StockReferenceNo { get; set; } = 0;
+        public string Branch_Code { get; set; } = string.Empty;
+    }
+    public class ItemIssueReturnSave
+    {
+        public int IRNo { get; set; }
+        public int INo { get; set; }
+        public DateTime IRDate { get; set; }
+        public string Branch_Code { get; set; } = string.Empty;
+        public decimal IRTotalAmount { get; set; } = 0;
+        public string StoredId { get; set; } = string.Empty;
+        public string IType { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string DeptCode { get; set; } = string.Empty;
+    }
+    public class ItemIssueReturnListDto
+    {
+        public ItemIssueReturnSave Master { get; set; } = new();
+        public List<ItemIssueReturnDetailRequest> Items { get; set; } = new();
+    }
+    public class ItemIssueReturnNumber
+    {
+        public int IssueNo { get; set; } = 0;
+        public string Status { get; set; } = string.Empty;
     }
     #endregion
 
@@ -1156,6 +1182,43 @@
         public DateTime CreatedDate { get; set; }
         public int? ModifiedBy { get; set; }
         public DateTime? ModifiedDate { get; set; }
+    }
+    #endregion
+
+    #region Stock Report
+    public class StockReportRequest
+    {
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
+        public string BranchCode { get; set; } = string.Empty;
+        public int StoreId { get; set; }
+        public int? ItemCode { get; set; }
+    }
+    public class StockReportResponse
+    {
+        public DateTime StockDate { get; set; }
+
+        public int ItemCode { get; set; }
+
+        public string ItemName { get; set; } = string.Empty;
+
+        public int StoreId { get; set; }
+
+        public string UnitName { get; set; } = string.Empty;
+
+        public decimal OpeningQty { get; set; }
+
+        public decimal PurchaseQty { get; set; }
+
+        public decimal PurchaseReturnQty { get; set; }
+
+        public decimal DamageQty { get; set; }
+
+        public decimal IssuedQty { get; set; }
+
+        public decimal IssuedReturnQty { get; set; }
+
+        public decimal ClosingQty { get; set; }
     }
     #endregion
 }

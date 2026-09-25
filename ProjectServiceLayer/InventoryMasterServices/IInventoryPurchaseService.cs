@@ -49,12 +49,14 @@ namespace HMS_360_PMS.ProjectServiceLayer.InventoryMasterServices
         Task<List<IndentOrderApprovalListDto>> GetIndentOrderApprovalData(string branchCode, int ioNo);
         Task<int> ItemIssueSave(ItemIssueSaveRequest request);
         Task<List<ItemIssueListDto>> GetItemIssuePrintData(string branchCode, int iNo);
-        Task<List<ItemIssueListDto>> GetItemIssueData(string branchCode);
+        Task<List<ItemIssueListDto>> GetItemIssueData(string branchCode,int ItemNo);
+        Task<List<ItemIssueReturnNumber>> GetItemIssueNumber(string branchCode);
         Task<int> ItemIssueReturnSave(ItemIssueReturnSaveRequest request);
-        Task<List<ItemIssueListDto>> GetItemIssueReturnPrintData(string branchCode, int iNo);
+        Task<List<ItemIssueReturnListDto>> GetItemIssueReturnPrintData(string branchCode, int IRNo);
         Task<List<ItemOpeningStock>> GetOpeningStockListAsync(string branchCode, int storeId);
         Task<int> SaveOpeningStockAsync(ItemOpeningStock request);
         Task<bool> UpdateOpeningStockAsync(ItemOpeningStock request);
         Task<bool> DeleteOpeningStockAsync(int openingStockId, int modifiedBy);
+        Task<List<StockReportResponse>> GetStockReportAsync(StockReportRequest request);
     }
 }
