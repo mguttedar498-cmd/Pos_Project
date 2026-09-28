@@ -4701,37 +4701,41 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             transaction);
 
                         decimal IndentOrderQty = Convert.ToDecimal(selectIndent?.IndentOrderQty ?? 0);
+                        if (item.PNo > 0)
+                        {
+                            const string resetPurchaseSql = @"UPDATE PurchaseDetail 
+                            SET IndentOrderQty =ISNULL(IndentOrderQty, 0) - @IndentOrderQty
+                            WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @Branch_Code;";
 
-                        const string resetPurchaseSql = @"UPDATE PurchaseDetail 
-                        SET IndentOrderQty =ISNULL(IndentOrderQty, 0) - @IndentOrderQty
-                        WHERE ItemCode = @ItemCode AND PNo = @PNo AND Branch_Code = @Branch_Code;";
+                            await connection.ExecuteAsync(
+                                resetPurchaseSql,
+                                new
+                                {
+                                    IndentOrderQty = IndentOrderQty,
+                                    ItemCode = item.ItemCode,
+                                    PNo = item.PNo,
+                                    Branch_Code = request.Branch_Code
+                                },
+                                transaction);
+                        }
+                        else if (item.PNo == 0)
+                        {
+                            const string resetOpeningStockSql = @"UPDATE Tbl_ItemOpeningStock
+                            SET IndentOrderQty = ISNULL(IndentOrderQty, 0) - @IndentOrderQty  
+                            WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code 
+                            AND Storeid = @StoreId;";
 
-                        await connection.ExecuteAsync(
-                            resetPurchaseSql,
-                            new
-                            {
-                                IndentOrderQty= IndentOrderQty,
-                                ItemCode = item.ItemCode,
-                                PNo = item.PNo,
-                                Branch_Code = request.Branch_Code
-                            },
-                            transaction);
-
-                        const string resetOpeningStockSql = @"UPDATE Tbl_ItemOpeningStock
-                        SET IndentOrderQty = ISNULL(IndentOrderQty, 0) - @IndentOrderQty  
-                        WHERE ItemCode = @ItemCode AND Branch_Code = @Branch_Code AND Storeid = @StoreId;";
-
-                        await connection.ExecuteAsync(
-                            resetOpeningStockSql,
-                            new
-                            {
-                                IndentOrderQty = item.IOItemQty,
-                                ItemCode = item.ItemCode,
-                                Branch_Code = request.Branch_Code,
-                                StoreId = request.StoreId
-                            },
-                            transaction);
-
+                            await connection.ExecuteAsync(
+                                resetOpeningStockSql,
+                                new
+                                {
+                                    IndentOrderQty = item.IndentQty,
+                                    ItemCode = item.ItemCode,
+                                    Branch_Code = request.Branch_Code,
+                                    StoreId = request.StoreId
+                                },
+                                transaction);
+                        }
                         const string deleteIndentDetailSql = @"DELETE FROM IndentOrderDetail
                         WHERE IONo = @IONo AND ItemCode = @ItemCode
                         AND Branch_Code = @Branch_Code AND PNo = @PNo;";
@@ -4860,8 +4864,23 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                         request.Branch_Code
                     },
                     transaction);
+                if (request.Status == "IOR")
+                {
+                    const string indentStatusSql = @"UPDATE IndentOrderApprovalMaster
+                    SET ItemIssueStatus = @Status WHERE IONo = @IONo AND Branch_Code = @BranchCode";
 
+                    await connection.ExecuteAsync(
+                        indentStatusSql,
+                        new
+                        {
+                            Status = "rejected",
+                            IONo = request.IONo,
+                            BranchCode = request.Branch_Code
+                        },
+                        transaction);
+                }
                 transaction.Commit();
+
                 return request.IONo;
             }
             catch
@@ -4925,7 +4944,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             using var connection = _factory.CreateConnection(DbNames.POS);
             const string sql = @"SELECT  IONo FROM IndentOrderApprovalMaster 
             WHERE Branch_Code = @BranchCode AND ISNULL(ItemIssueStatus, '') != 'issue'
-            ORDER BY IONo DESC";
+            AND ISNULL(ItemIssueStatus, '') != 'rejected' ORDER BY IONo DESC";
 
             var result = await connection.QueryAsync<IndentOrderSearchResponse>(
                 sql,
@@ -4991,13 +5010,19 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             {
                 throw new Exception("Item list is empty.");
             }
+            if (request == null)
+            {
+                throw new Exception("Request is null.");
+            }
+            if (string.IsNullOrWhiteSpace(request.Branch_Code))
+            {
+                throw new Exception("Branch_Code is null or empty.");
+            }
             using var connection = _factory.CreateConnection(DbNames.POS);
             connection.Open();
             using var transaction = connection.BeginTransaction();
-
             try
             {
-
                 const string masterSql = @"
                 INSERT INTO ItemIssueMaster
                 (
@@ -5186,7 +5211,7 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
                             transaction);
                     }
 
-                    if (item.IssueQty > 0)
+                    if (item.IssueQty > 0 && request.IndentNo >0)
                     {
                         const string updateIssuedQtySql = @"
                         UPDATE IndentOrderApprovalDetail
