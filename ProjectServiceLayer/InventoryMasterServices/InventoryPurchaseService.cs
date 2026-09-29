@@ -442,5 +442,17 @@ namespace HMS_360_PMS.ProjectServiceLayer.InventoryMasterServices
         {
             return await _repository.GetItemIssueReturnPrintData(branchCode, IRNo);
         }
+        public async Task<int> OpeningStockCreate( ItemOpeningStockRequest request)
+        {
+            return await _repository.OpeningStockCreate(request);
+        }
+        public async Task<int> OpeningStockUpdate(ItemOpeningStockRequest request)
+        {
+            return await _repository.OpeningStockUpdate(request);
+        }
+        public async Task<ItemOpeningStockRequest?> GetOpeningStockList(string branchCode)
+        {
+            return await _repository.GetOpeningStockList(branchCode);
+        }
     }
 }

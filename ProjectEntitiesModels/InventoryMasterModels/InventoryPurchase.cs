@@ -1132,4 +1132,34 @@
         public string Status { get; set; } = string.Empty;
     }
     #endregion
+
+    public class ItemOpeningStockRequest
+    {
+        public int OpeningStockId { get; set; }
+        public int ItemCode { get; set; }
+        public int StoreId { get; set; }
+        public int? DeptCode { get; set; }
+        public string Branch_Code { get; set; } = string.Empty;
+        public DateTime StockDate { get; set; }
+        public decimal OpeningQty { get; set; }
+        public int? UnitCode { get; set; }
+        public string? UnitName { get; set; }
+        public decimal BaseOpeningQty { get; set; }
+        public int? BaseUnitCode { get; set; }
+        public string? BaseUnitName { get; set; }
+        public decimal ClosingQty { get; set; }
+        public decimal OpeningRate { get; set; }
+        public bool IsActive { get; set; } = true;
+        public int? CreatedBy { get; set; }
+        public int? ModifiedBy { get; set; }
+        public decimal? IndentOrderQty { get; set; }
+        public decimal? IndentApprovalQty { get; set; }
+        public decimal? IssuedQty { get; set; }
+        public decimal? IssuedReturnQty { get; set; }
+    }
+    public class ItemOpeningStockResponse
+    {
+        public int OpeningStockId { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 }

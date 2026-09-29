@@ -338,49 +338,72 @@ namespace HMS_360_PMS.DAL_Layers.POS
         public async Task<KOTModel> SaveKOT(int Outlet, string Table, int Waiter, int Pax, DateTime POSEntryDate, double Total, int UserCode, bool Settled, bool Canceled,
             string SubTable, string BranchCode, string Type, string Remarks, int dkot, string CheckInNo, string GuestName, string GuestCode, string GuestMobileNo, string FinCode)
         {
-            using var connection = _factory.CreateConnection(DbNames.POS);
-
-            var param = new DynamicParameters();
-
-            param.Add("@POSCode", "1");
-            param.Add("@OltCode", Outlet);
-            param.Add("@KOTTblNo", Table);
-            param.Add("@StwCode", Waiter);
-            param.Add("@KOTSeatsServed", Pax);
-            param.Add("@KOTDate", POSEntryDate.Date); // ✅ better to pass DateTime
-            param.Add("@KOTTime", DateTime.Now);
-
-            param.Add("@KOTChargeable", Type == "N" ? false : true);
-
-            param.Add("@KOTTotal", Total);
-            param.Add("@CheckinNo", CheckInNo ?? "0");
-            param.Add("@KOTGuestName", GuestName ?? "-");
-            param.Add("@UserCode", UserCode);
-            param.Add("@LastModify", DateTime.Now);
-            param.Add("@NCKOT_Particulars", Remarks);
-            param.Add("@KOTSettled", Settled);
-            param.Add("@KOTCANCELLED", Canceled);
-            param.Add("@SUBTABLE", SubTable ?? "A");
-            param.Add("@DKOTNO", dkot);
-            param.Add("@DAYEND", "N");
-            param.Add("@guestcode", 0);
-            param.Add("@Branch_Code", BranchCode);
-            param.Add("@flag", 1);
-            param.Add("@IsOnline", 0);
-            param.Add("@KotMobileNo", GuestMobileNo);
-            param.Add("@KotOrderNo", 0);
-            param.Add("@FinCode", FinCode);
-
-            param.Add("@KOTId", dbType: DbType.Int32, direction: ParameterDirection.Output);
-            param.Add("@KOTNo", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
-            await connection.ExecuteAsync("SaveKot", param, commandType: CommandType.StoredProcedure);
-
-            return new KOTModel
+            try
             {
-                KOTId = param.Get<int>("@KOTId"),
-                KOTNo = param.Get<int>("@KOTNo")
-            };
+                using var connection = _factory.CreateConnection(DbNames.POS);
+
+                var param = new DynamicParameters();
+
+                param.Add("@POSCode", "1");
+                param.Add("@OltCode", Outlet);
+                param.Add("@KOTTblNo", Table);
+                param.Add("@StwCode", Waiter);
+                param.Add("@KOTSeatsServed", Pax);
+                param.Add("@KOTDate", POSEntryDate.Date); // ✅ better to pass DateTime
+                param.Add("@KOTTime", DateTime.Now);
+
+                param.Add("@KOTChargeable", Type == "N" ? false : true);
+
+                param.Add("@KOTTotal", Total);
+                param.Add("@CheckinNo", CheckInNo ?? "0");
+                param.Add("@KOTGuestName", GuestName ?? "-");
+                param.Add("@UserCode", UserCode);
+                param.Add("@LastModify", DateTime.Now);
+                param.Add("@NCKOT_Particulars", Remarks);
+                param.Add("@KOTSettled", Settled);
+                param.Add("@KOTCANCELLED", Canceled);
+                param.Add("@SUBTABLE", SubTable ?? "A");
+                param.Add("@DKOTNO", dkot);
+                param.Add("@DAYEND", "N");
+                param.Add("@guestcode", 0);
+                param.Add("@Branch_Code", BranchCode);
+                param.Add("@flag", 1);
+                param.Add("@IsOnline", 0);
+                param.Add("@KotMobileNo", GuestMobileNo);
+                param.Add("@KotOrderNo", 0);
+                param.Add("@FinCode", FinCode);
+
+                param.Add("@KOTId", dbType: DbType.Int32, direction: ParameterDirection.Output);
+                param.Add("@KOTNo", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+                await connection.ExecuteAsync("SaveKot", param, commandType: CommandType.StoredProcedure);
+
+                return new KOTModel
+                {
+                    KOTId = param.Get<int>("@KOTId"),
+                    KOTNo = param.Get<int>("@KOTNo")
+                };
+            }
+            catch(Exception ex)
+            {
+                // Use AppContext.BaseDirectory or inject IWebHostEnvironment to get the root path safely
+                //string folderPath = Path.Combine(AppContext.BaseDirectory, "App_Data");
+                string folderPath = @"C:\Cogwave\POSWEBSITE\HMS_360_Logs";
+
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                string path = Path.Combine(folderPath, "output.txt");
+
+                string logContent = "-----------------------------------" + DateTime.Now + "--------- " + BranchCode + "-------SaveKOT-------------------" + Environment.NewLine +
+                                    ex.Message + ex.StackTrace + Environment.NewLine +
+                                    "---------------------------------------------------------------------------------" + Environment.NewLine;
+
+                File.AppendAllText(path, logContent);
+                throw;
+            }
         }
 
         public async Task<int> GetNextDKOT(string branchcode)

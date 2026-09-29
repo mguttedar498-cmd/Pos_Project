@@ -786,5 +786,40 @@ namespace HMS_360_PMS.ProjectAPI.Controllers.InventoryMaster
                 "Item issue return data retrieved successfully"));
         }
         #endregion
+
+        #region Opening Stock
+        [HttpPost("OpeningStockCreate")]
+        public async Task<IActionResult> OpeningStockCreate([FromBody] ItemOpeningStockRequest request)
+        {
+            if (request == null)
+                return Fail("Invalid request payload");
+            var result = await _service.OpeningStockCreate(request);
+
+            return CreatedAtAction(nameof(GetOpeningStockList),new { openingStockId = result },
+                ApiResponse<int>.SuccessResult(result,"Opening stock created successfully"));
+        }
+
+        [HttpPut("OpeningStockUpdate")]
+        public async Task<IActionResult> OpeningStockUpdate([FromBody] ItemOpeningStockRequest request)
+        {
+            if (request == null)
+                return Fail("Invalid request payload");
+
+            var result = await _service.OpeningStockUpdate(request);
+
+            return Ok(ApiResponse<int>.SuccessResult(
+                result, "Opening stock updated successfully"));
+        }
+
+        [HttpGet("GetOpeningStockList")]
+        public async Task<IActionResult> GetOpeningStockList([FromQuery] string BranchCode)
+        {
+            var result = await _service.GetOpeningStockList(BranchCode);
+
+            return Ok(ApiResponse<ItemOpeningStockRequest>.SuccessResult(
+              result,"Opening stock retrieved successfully"));
+        }
+        #endregion
+
     }
 }

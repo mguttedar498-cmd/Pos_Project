@@ -53,5 +53,8 @@ namespace HMS_360_PMS.ProjectServiceLayer.InventoryMasterServices
         Task<List<ItemIssueReturnNumber>> GetItemIssueNumber(string branchCode);
         Task<int> ItemIssueReturnSave(ItemIssueReturnSaveRequest request);
         Task<List<ItemIssueReturnListDto>> GetItemIssueReturnPrintData(string branchCode, int IRNo);
+        Task<int> OpeningStockCreate(ItemOpeningStockRequest request);
+        Task<int> OpeningStockUpdate(ItemOpeningStockRequest request);
+        Task<ItemOpeningStockRequest?> GetOpeningStockList(string branchCode);
     }
 }

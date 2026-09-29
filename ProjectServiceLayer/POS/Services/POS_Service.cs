@@ -462,36 +462,6 @@ namespace HMS_360_PMS.Services_Layers.POS.Services
         {
             var CombinedList = await _repository.GetCombinedOltItemList(oltcode, grpcode, branchcode);
 
-            if (CombinedList == null || !CombinedList.Any())
-            {
-                return new List<CategoryListDto>
-                {
-                    new CategoryListDto
-                    {
-                        OltCode = oltcode,
-                        Branchcode = branchcode,
-                        CatCode = 0,
-                        CatName = "",
-                        catthumb = null,
-                        GrpCode = grpcode.ToString(),
-                        GrpName = "",
-
-                        Items = new List<ItemListDto>
-                        {
-                            new ItemListDto
-                            {
-                                ItemCode = 0,
-                                ItemName = "",
-                                OIDRate = 0,
-                                OIDAvailable = false,
-                                ItemDiscountAllowed = false,
-                                thumb = null,
-                                IsVeg = false
-                            }
-                        }
-                    }
-                };
-            }
             var result = CombinedList
                  .GroupBy(x => new
                  {
@@ -1879,6 +1849,23 @@ namespace HMS_360_PMS.Services_Layers.POS.Services
             }
             catch (Exception ex)
             {
+                // Use AppContext.BaseDirectory or inject IWebHostEnvironment to get the root path safely
+                //string folderPath = Path.Combine(AppContext.BaseDirectory, "App_Data");
+                string folderPath = @"C:\Cogwave\POSWEBSITE\HMS_360_Logs";
+
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                string path = Path.Combine(folderPath, "output.txt");
+
+                string logContent = "-----------------------------------" + DateTime.Now + "-------"+ cartdetails.Branch + "---------SubmitPOSOrder-------------------" + Environment.NewLine +
+                                    ex.Message + ex.StackTrace + Environment.NewLine +
+                                    "---------------------------------------------------------------------------------" + Environment.NewLine;
+
+                File.AppendAllText(path, logContent);
+
                 return new KOTBillModelDto
                 {
                     Message = ex.StackTrace.ToString()
@@ -3097,8 +3084,25 @@ namespace HMS_360_PMS.Services_Layers.POS.Services
                     BillTime = billdatetime.billTime
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                // Use AppContext.BaseDirectory or inject IWebHostEnvironment to get the root path safely
+                //string folderPath = Path.Combine(AppContext.BaseDirectory, "App_Data");
+                string folderPath = @"C:\Cogwave\POSWEBSITE\HMS_360_Logs";
+
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                string path = Path.Combine(folderPath, "output.txt");
+
+                string logContent = "-----------------------------------" + DateTime.Now + "-------" + bill.Cart.Branch +"---------PostBill-------------------" + Environment.NewLine +
+                                    ex.Message + ex.StackTrace + Environment.NewLine +
+                                    "---------------------------------------------------------------------------------" + Environment.NewLine;
+
+                File.AppendAllText(path, logContent);
+
                 throw;
             }
         }
@@ -3153,6 +3157,23 @@ namespace HMS_360_PMS.Services_Layers.POS.Services
 
                 var ksm = await _repository.SettleKOTPartI(POSEntryDate, ECart, taxmodel.CGSTAmt + taxmodel.SGSTAmt, taxmodel.Discount, reason, taxmodel.RoundOff,
                     0, billingtype, subbillingtype, cart.GuestName, cart.KotMobileNo, fincode);
+
+                //if(ksm.billno == "0" && ksm.ksmid == 0)
+                //{
+                //    var detelekot = await _kotbillsettlementdal.GetKOTDetails(cart.Table, cart.SubTable, cart.Outlet, cart.Branch);
+
+                //    foreach (var item in detelekot)
+                //    {
+                //        await _kotbillsettlementdal.DeleteKOTMasterAndDetails(item.kotid, POSEntryDate, cart.Branch);
+                //    }
+
+                //    return new KOTSettlementStatusModel()
+                //    {
+                //        Status = false,
+                //        BillNo = string.Empty,
+                //        BillId = 0
+                //    };
+                //}
 
                 await _kotbillsettlementdal.UpdateKOTSettlementMaster(ksm.ksmid, cart.Branch, taxmodel.ServiceCharge);
 
@@ -3289,8 +3310,38 @@ namespace HMS_360_PMS.Services_Layers.POS.Services
                     BillId = ksm.ksmid
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                //var detelekot = await _kotbillsettlementdal.GetKOTDetails(cart.Table, cart.SubTable, cart.Outlet, cart.Branch);
+
+                //foreach (var item in detelekot)
+                //{
+                //    await _kotbillsettlementdal.DeleteKOTMasterAndDetails(item.kotid, POSEntryDate, cart.Branch);
+                //}
+
+                //return new KOTSettlementStatusModel()
+                //{
+                //    Status = false,
+                //    BillNo = string.Empty,
+                //    BillId = 0
+                //};
+
+                // Use AppContext.BaseDirectory or inject IWebHostEnvironment to get the root path safely
+                //string folderPath = Path.Combine(AppContext.BaseDirectory, "App_Data");
+                string folderPath = @"C:\Cogwave\POSWEBSITE\HMS_360_Logs";
+
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
+                string path = Path.Combine(folderPath, "output.txt");
+
+                string logContent = "-----------------------------------" + DateTime.Now + "------"+ cart.Branch + "----------KotBillSettlement-------------------" + Environment.NewLine +
+                                    ex.Message + ex.StackTrace + Environment.NewLine +
+                                    "---------------------------------------------------------------------------------" + Environment.NewLine;
+
+                File.AppendAllText(path, logContent);
                 throw;
             }
         }

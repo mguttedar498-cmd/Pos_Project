@@ -183,6 +183,7 @@ builder.Services.AddScoped<IUserAccess_Service, UserAccess_Service>();
 builder.Services.AddScoped<ICCAvenueQRDevice_Service, CCAvenueQRDevice_Service>();
 builder.Services.AddScoped<IProductLicence_Service, ProductLicence_Service>();
 builder.Services.AddScoped<IMSIC_Services, MSIC_Service>();
+
 builder.Services.AddScoped<ProductLicence_Service>();
 builder.Services.AddScoped<EmailSender_Service>();
 builder.Services.AddScoped<IInventoryMasterService, InventoryMasterService>();

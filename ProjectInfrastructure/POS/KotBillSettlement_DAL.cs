@@ -218,6 +218,18 @@ namespace HMS_360_PMS.HMS_360_PMS.Infrastructure.POS
             var selectquery = "Select OltName from OutletMaster where OltCode= @Outlet AND branch_code = @BranchCode";
             return await connection.QueryFirstOrDefaultAsync<string>(selectquery, new { Outlet = outlet, BranchCode = branchCode });
         }
+
+        public async Task<int> DeleteKOTMasterAndDetails(int kotid, DateTime openday, string branch)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            string sql = @"
+                    DELETE FROM KOTDetails WHERE KOTId = @KOTId AND branch_code = @Branch;
+                    DELETE FROM KOTMaster WHERE KOTId = @KOTId And KOTDate = @KOTDate AND KOTSettled = 0 AND Branch_Code = @Branch; ";
+
+            return await connection.ExecuteAsync(sql, new { KOTId = kotid, KOTDate = openday.Date, Branch = branch });
+        }
+
     }
 }
 

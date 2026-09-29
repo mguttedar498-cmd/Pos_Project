@@ -161,7 +161,7 @@ namespace HMS_360_PMS.HMS_360_PMS.Infrastructure.POS
                 sql.Append(@" And k.OltCode = @OltCode ");
             }
 
-            sql.Append(@"UNION ALL SELECT 'Cancelled' AS Particulars, Round((KSMBillAmount + KSMBillTaxAmt - KSMBillDiscount + famt), 2) AS Amount FROM KOTSettlementMaster WHERE BillCancelled = 1 AND Branch_Code = @branch AND Convert(DATE, KSMBillDate) >= @FromDate and Convert(DATE, KSMBillDate) <= @ToDate ");
+            sql.Append(@"UNION ALL SELECT 'Cancelled' AS Particulars, Round((KSMBillAmount + KSMBillTaxAmt - KSMBillDiscount + famt), 2) AS Amount FROM KOTSettlementMaster WHERE (KSMBillSettled = 1 OR KSMBillSettled = 0) AND BillCancelled = 1 AND Branch_Code = @branch AND Convert(DATE, KSMBillDate) >= @FromDate and Convert(DATE, KSMBillDate) <= @ToDate ");
 
             if (olt != "0")
             {

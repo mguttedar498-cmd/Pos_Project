@@ -5306,5 +5306,99 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
             return result;
         }
         #endregion
+
+        public async Task<int> OpeningStockCreate(ItemOpeningStockRequest request)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+
+            const string sql = @"
+                INSERT INTO Tbl_ItemOpeningStock
+                (
+                    ItemCode,
+                    StoreId,
+                    DeptCode,
+                    Branch_Code,
+                    StockDate,
+                    OpeningQty,
+                    UnitCode,
+                    UnitName,
+                    BaseOpeningQty,
+                    BaseUnitCode,
+                    BaseUnitName,
+                    ClosingQty,
+                    OpeningRate,
+                    IsActive,
+                    CreatedBy,
+                    CreatedDate
+                )
+                VALUES
+                (
+                    @ItemCode,
+                    @StoreId,
+                    @DeptCode,
+                    @Branch_Code,
+                    @StockDate,
+                    @OpeningQty,
+                    @UnitCode,
+                    @UnitName,
+                    @BaseOpeningQty,
+                    @BaseUnitCode,
+                    @BaseUnitName,
+                    @ClosingQty,
+                    @OpeningRate,
+                    @IsActive,
+                    @CreatedBy,
+                    GETDATE()
+                );
+
+                SELECT CAST(SCOPE_IDENTITY() AS INT);";
+
+            return await connection.ExecuteScalarAsync<int>(sql,request);
+        }
+
+        public async Task<int> OpeningStockUpdate(ItemOpeningStockRequest request)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+            const string sql = @"
+                UPDATE Tbl_ItemOpeningStock
+                SET
+                    StoreId = @StoreId,
+                    DeptCode = @DeptCode,
+                    Branch_Code = @Branch_Code,
+                    StockDate = @StockDate,
+                    OpeningQty = @OpeningQty,
+                    UnitCode = @UnitCode,
+                    UnitName = @UnitName,
+                    BaseOpeningQty = @BaseOpeningQty,
+                    BaseUnitCode = @BaseUnitCode,
+                    BaseUnitName = @BaseUnitName,
+                    ClosingQty = @ClosingQty,
+                    OpeningRate = @OpeningRate,
+                    IsActive = @IsActive,
+                    ModifiedBy = @ModifiedBy,
+                    ModifiedDate = GETDATE()
+                WHERE OpeningStockId = @OpeningStockId and ItemCode=@ItemCode;";
+
+            return await connection.ExecuteAsync(sql,request);
+        }
+
+        public async Task<ItemOpeningStockRequest?> GetOpeningStockList(string branchcode)
+        {
+            using var connection = _factory.CreateConnection(DbNames.POS);
+            const string sql = @"SELECT OpeningStockId,ItemCode,StoreId,
+            DeptCode,Branch_Code,StockDate,OpeningQty,UnitCode,
+            UnitName,BaseOpeningQty,BaseUnitCode,
+            BaseUnitName,ClosingQty,OpeningRate,IsActive,
+            CreatedBy,CreatedDate,ModifiedBy,ModifiedDate
+            FROM Tbl_ItemOpeningStock
+            WHERE Branch_Code = @branchCode;";
+
+            return await connection.QueryFirstOrDefaultAsync<ItemOpeningStockRequest>(
+                sql,
+                new
+                {
+                    branchCode = branchcode
+                });
+        }
     }
 }

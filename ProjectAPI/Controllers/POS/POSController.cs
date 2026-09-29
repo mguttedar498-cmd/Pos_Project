@@ -236,11 +236,10 @@ namespace HMS_360_PMS.API.Controllers.POS
         public async Task<IActionResult> GetCombinedOltItemList(int oltcode, int grpcode, string branchcode)
         {
             var data = await _service.GetCombinedOltItemList(oltcode, grpcode, branchcode);
-            //if (data == null || !data.Any())
-            //    return NotFound($"No Combined list of outletitem details for Branchcode '{branchcode}'");
+            if (data == null || !data.Any())
+                return NotFound($"No Combined list of outletitem details for Branchcode '{branchcode}'");
 
-            //return Ok(data);
-            return Ok(data ?? Enumerable.Empty<CategoryListDto>());
+            return Ok(data);
         }
 
         //[Authorize]
@@ -257,6 +256,7 @@ namespace HMS_360_PMS.API.Controllers.POS
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred while posting the bill.");
                 return StatusCode(500, "An unexpected error occurred.");
             }
         }
