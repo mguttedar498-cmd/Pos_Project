@@ -5355,7 +5355,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
 
             return await connection.ExecuteScalarAsync<int>(sql,request);
         }
-
         public async Task<int> OpeningStockUpdate(ItemOpeningStockRequest request)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
@@ -5381,7 +5380,6 @@ namespace HMS_360_PMS.ProjectInfrastructure.InventoryMaster_Infra
 
             return await connection.ExecuteAsync(sql,request);
         }
-
         public async Task<ItemOpeningStockRequest?> GetOpeningStockList(string branchcode)
         {
             using var connection = _factory.CreateConnection(DbNames.POS);
